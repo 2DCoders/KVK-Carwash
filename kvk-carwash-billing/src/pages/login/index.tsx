@@ -69,7 +69,7 @@ export default function Login() {
       )
 
       localStorage.setItem('cashier', JSON.stringify(cashier))
-      navigate('/dayend')
+      navigate('/services')
     } catch (error) {
       console.error('Login failed:', error)
 

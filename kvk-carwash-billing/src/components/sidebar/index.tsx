@@ -7,6 +7,8 @@ import {
   Settings,
   ChevronDown,
   Ticket,
+  CarFront,
+  Boxes,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -70,24 +72,17 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
 
   const navItems: NavItem[] = [
     {
-      id: "members",
-      label: "Members",
-      icon: Users,
-      path: "/members",
+      id: "services",
+      label: "Services",
+      icon: CarFront,
+      path: "/services",
       submenu: null,
     },
     {
-      id: "trainers",
-      label: "Trainers",
-      icon: Dumbbell,
-      path: "/trainers",
-      submenu: null,
-    },
-    {
-      id: "daypass",
-      label: "Day Pass",
-      icon: Ticket,
-      path: "/daypass",
+      id: "packages",
+      label: "Packages",
+      icon: Boxes,
+      path: "/packages",
       submenu: null,
     },
     {
