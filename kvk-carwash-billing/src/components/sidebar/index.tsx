@@ -8,8 +8,6 @@ import {
   ChevronDown,
   Ticket,
 } from "lucide-react";
-import { getDayEndData } from "@/services/day-end-api";
-import { useEffect, useState } from "react";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -36,39 +34,39 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const collapsed = !isOpen && !isMobile;
 
-  const [isDidDayEnd, setIsDidDayEnd] = useState(false);
+  // const [isDidDayEnd, setIsDidDayEnd] = useState(false);
 
   const cashier = localStorage.getItem("cashier")
     ? JSON.parse(localStorage.getItem("cashier") as string)
     : null;
 
-  const handleGetDayEndData = async () => {
-    const today = new Date().toISOString().split("T")[0];
+  // const handleGetDayEndData = async () => {
+  //   const today = new Date().toISOString().split("T")[0];
 
-    try {
-      const res = await getDayEndData(today);
-      if (res && res.length > 0) {
-        setIsDidDayEnd(true);
-        localStorage.setItem("dayEndData", JSON.stringify(res[0]));
-      } else {
-        setIsDidDayEnd(false);
-        localStorage.removeItem("dayEndData");
-      }
-    } catch (error) {
-      setIsDidDayEnd(false);
-      localStorage.removeItem("dayEndData");
-    }
-  };
+  //   try {
+  //     const res = await getDayEndData(today);
+  //     if (res && res.length > 0) {
+  //       setIsDidDayEnd(true);
+  //       localStorage.setItem("dayEndData", JSON.stringify(res[0]));
+  //     } else {
+  //       setIsDidDayEnd(false);
+  //       localStorage.removeItem("dayEndData");
+  //     }
+  //   } catch (error) {
+  //     setIsDidDayEnd(false);
+  //     localStorage.removeItem("dayEndData");
+  //   }
+  // };
 
-  useEffect(() => {
-    handleGetDayEndData();
-  }, []);
+  // useEffect(() => {
+  //   handleGetDayEndData();
+  // }, []);
 
-  const canAccessMenu = (itemId: string) => {
-    if (isDidDayEnd) return true;
+  // const canAccessMenu = (itemId: string) => {
+  //   if (isDidDayEnd) return true;
     
-    return itemId === "dayend";
-  };
+  //   return itemId === "dayend";
+  // };
 
   const navItems: NavItem[] = [
     {
@@ -144,7 +142,7 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
               {!collapsed && (
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 truncate">
-                    KVK Gym System
+                    KVK Carwash System
                   </p>
                   <p className="text-xs text-gray-500">Cashier Panel</p>
                 </div>
@@ -165,21 +163,16 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
                 <div key={item.id}>
                   <button
                     onClick={() => {
-                      if (!canAccessMenu(item.id)) return;
+                      // if (!canAccessMenu(item.id)) return;
                       handleNavigation(item.path);
                     }}
-                    disabled={!canAccessMenu(item.id)}
+                    // disabled={!canAccessMenu(item.id)}
                     className={`${btnBase}
                       ${
                         active && !collapsed
                           ? "bg-blue-50 text-blue-700 shadow-sm"
                           : "text-gray-700 hover:bg-gray-50"
-                      }
-                      ${
-                        !canAccessMenu(item.id)
-                          ? "opacity-50 cursor-not-allowed"
-                          : "cursor-pointer"
-                      }
+                      } cursor-pointer
                     `}
                   >
                     <div
