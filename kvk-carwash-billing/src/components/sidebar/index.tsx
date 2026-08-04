@@ -131,7 +131,7 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
           {/* Brand Header */}
           <div className="px-4 pt-4 pb-3 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
+              <div className="w-9 h-9 rounded-lg bg-blue-900 text-white flex items-center justify-center shadow-sm">
                 <span className="text-xs font-bold">KVK</span>
               </div>
               {!collapsed && (
@@ -152,7 +152,7 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
               const active = isActive(item.path);
 
               const btnBase = `w-full flex items-center ${collapsed ? "justify-center" : "justify-between"} ${collapsed ? "px-2" : "px-3"} py-1.5 rounded-xl transition-colors duration-150`;
-              const iconWrapper = `${active ? "bg-blue-50 text-blue-600" : "text-gray-400"} w-8 h-8 flex items-center justify-center rounded-lg transition`;
+              const iconWrapper = `${active ? "bg-blue-50 text-blue-900" : "text-gray-400"} w-8 h-8 flex items-center justify-center rounded-lg transition`;
 
               return (
                 <div key={item.id}>
@@ -165,7 +165,7 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
                     className={`${btnBase}
                       ${
                         active && !collapsed
-                          ? "bg-blue-50 text-blue-700 shadow-sm"
+                          ? "bg-blue-50 text-blue-900 shadow-sm"
                           : "text-gray-700 hover:bg-gray-50"
                       } cursor-pointer
                     `}
@@ -178,7 +178,7 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
                       </span>
                       {!collapsed && (
                         <span
-                          className={`text-sm ${active ? "text-blue-700 font-semibold" : "text-gray-700"}`}
+                          className={`text-sm ${active ? "text-blue-900 font-semibold" : "text-gray-700"}`}
                         >
                           {item.label}
                         </span>
