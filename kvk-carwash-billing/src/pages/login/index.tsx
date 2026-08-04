@@ -288,7 +288,7 @@ export default function Login() {
                     User ID
                   </Label>
 
-                  <div className="group relative">
+                  <div className="group relative border rounded-xl border-white/10 bg-[#061329]/80 hover:border-blue-400/30 focus-within:border-blue-400 focus-within:ring-blue-500/20">
                     <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400" />
 
                     <Input
@@ -299,7 +299,7 @@ export default function Login() {
                       value={formData.userId}
                       onChange={handleChange}
                       autoComplete="username"
-                      className="h-11 rounded-xl border-white/10 bg-[#061329]/80 pl-10 text-white placeholder:text-slate-600 hover:border-blue-400/30 focus-visible:border-blue-400 focus-visible:ring-blue-500/20"
+                      className="h-11 rounded-xl border-white/10 bg-[#061329]/80 pl-10 text-black placeholder:text-slate-600 hover:border-blue-400/30 focus-visible:border-blue-400 focus-visible:ring-blue-500/20"
                       required
                     />
                   </div>
@@ -313,7 +313,7 @@ export default function Login() {
                     Password
                   </Label>
 
-                  <div className="group relative">
+                  <div className="group relative border rounded-xl border-white/10 bg-[#061329]/80 hover:border-blue-400/30 focus-within:border-blue-400 focus-within:ring-blue-500/20">
                     <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400" />
 
                     <Input
@@ -324,7 +324,7 @@ export default function Login() {
                       value={formData.password}
                       onChange={handleChange}
                       autoComplete="current-password"
-                      className="h-11 rounded-xl border-white/10 bg-[#061329]/80 pl-10 pr-11 text-white placeholder:text-slate-600 hover:border-blue-400/30 focus-visible:border-blue-400 focus-visible:ring-blue-500/20"
+                      className="h-11 rounded-xl border-white/10 bg-[#061329]/80 pl-10 pr-11 text-black placeholder:text-slate-600 hover:border-blue-400/30 focus-visible:border-blue-400 focus-visible:ring-blue-500/20"
                       required
                     />
 

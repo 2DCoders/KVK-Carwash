@@ -24,14 +24,82 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
+import { getCarServices } from "@/services/carwash-services-api";
 
 type Service = {
   id: string;
   title: string;
   description: string;
   price: number;
-  imageUrl?: string;
+  image?: string | null;
   features: string[];
+};
+
+const DEFAULT_IMAGE_MIME_TYPE = "image/jpeg";
+
+const getBase64ImageSource = (image?: string | null) => {
+  if (!image) return "";
+
+  const value = image.trim();
+
+  if (
+    value.startsWith("data:image/") ||
+    value.startsWith("blob:") ||
+    value.startsWith("http://") ||
+    value.startsWith("https://")
+  ) {
+    return value;
+  }
+
+  return `data:${DEFAULT_IMAGE_MIME_TYPE};base64,${value}`;
+};
+
+
+const normalizeFeatures = (features: unknown): string[] => {
+  if (Array.isArray(features)) {
+    return features
+      .map((feature) => String(feature).trim())
+      .filter(Boolean);
+  }
+
+  if (typeof features === "string") {
+    return features
+      .split(",")
+      .map((feature) => feature.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const normalizeService = (service: any): Service => ({
+  id: String(service.id ?? crypto.randomUUID()),
+  title: String(service.title ?? ""),
+  description: String(service.description ?? ""),
+  price: Number(service.price ?? 0),
+  image: service.image ?? null,
+  features: normalizeFeatures(service.features),
+});
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Unable to convert the image to Base64."));
+    };
+
+    reader.onerror = () => {
+      reject(reader.error ?? new Error("Unable to read the image file."));
+    };
+
+    reader.readAsDataURL(file);
+  });
 };
 
 type ServiceForm = {
@@ -58,61 +126,6 @@ const initialForm: ServiceForm = {
   feature1: "",
   feature2: "",
 };
-
-const sampleServices: Service[] = [
-  {
-    id: "1",
-    title: "Premium Wash",
-    description:
-      "A complete exterior wash using premium cleaning products for a spotless and polished finish.",
-    price: 2500,
-    imageUrl:
-      "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=900&q=80",
-    features: [
-      "High-pressure exterior wash",
-      "Premium shampoo and hand drying",
-    ],
-  },
-  {
-    id: "2",
-    title: "Car Detailing",
-    description:
-      "Professional interior and exterior detailing designed to restore your vehicle’s appearance.",
-    price: 8500,
-    imageUrl:
-      "https://images.unsplash.com/photo-1597007066704-67bf2068d5b2?auto=format&fit=crop&w=900&q=80",
-    features: [
-      "Interior deep cleaning",
-      "Exterior finishing and protection",
-    ],
-  },
-  {
-    id: "3",
-    title: "Cut and Polish",
-    description:
-      "Paint correction service that removes minor scratches and restores the vehicle’s original shine.",
-    price: 12000,
-    imageUrl:
-      "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=900&q=80",
-    features: [
-      "Minor scratch removal",
-      "Machine polishing and gloss finish",
-    ],
-  },
-  {
-    id: "4",
-    title: "Interior Vacuum",
-    description:
-      "Thorough vacuum cleaning for seats, carpets, mats and difficult-to-reach interior areas.",
-    price: 1800,
-    imageUrl:
-      "https://images.unsplash.com/photo-1558317374-067fb5f30001?auto=format&fit=crop&w=900&q=80",
-    features: [
-      "Seat and carpet vacuuming",
-      "Dashboard and console dust removal",
-    ],
-  },
-];
 
 export default function CarwashServices() {
   const [services, setServices] = useState<Service[]>([]);
@@ -149,29 +162,25 @@ export default function CarwashServices() {
 
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchServices = async () => {
+  const getCarwashServices = async () => {
     try {
       setIsLoading(true);
 
-      /*
-       Replace this with your API call:
-
-       const response = await getCarwashServices();
-       setServices(response);
-      */
-
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setServices(sampleServices);
+      const response = await getCarServices();
+      setServices(
+        Array.isArray(response)
+          ? response.map(normalizeService)
+          : [],
+      );
     } catch (error) {
-      console.error("Failed to fetch services:", error);
+      console.error("Unable to load car wash services:", error);
       setServices([]);
 
       setPageAlert({
         visible: true,
         variant: "error",
         title: "Unable to load services",
-        description:
-          "An error occurred while loading car wash services.",
+        description: "An error occurred while loading car wash services.",
       });
     } finally {
       setIsLoading(false);
@@ -179,7 +188,7 @@ export default function CarwashServices() {
   };
 
   useEffect(() => {
-    fetchServices();
+    getCarwashServices();
   }, []);
 
   useEffect(() => {
@@ -281,7 +290,7 @@ export default function CarwashServices() {
     });
 
     setSelectedImage(null);
-    setImagePreview(service.imageUrl ?? "");
+    setImagePreview(getBase64ImageSource(service.image));
     setFormErrors({});
     setIsFormModalOpen(true);
     setOpenMenuId(null);
@@ -400,25 +409,38 @@ export default function CarwashServices() {
     return true;
   };
 
-  const handleImageSelection = (file: File | null) => {
+  const handleImageSelection = async (file: File | null) => {
     if (!file || !validateImage(file)) {
       return;
     }
 
-    setSelectedImage(file);
-    setImagePreview(URL.createObjectURL(file));
+    try {
+      const base64Image = await fileToBase64(file);
 
-    setFormErrors((previous) => ({
-      ...previous,
-      image: undefined,
-    }));
+      setSelectedImage(file);
+      setImagePreview(base64Image);
+
+      setFormErrors((previous) => ({
+        ...previous,
+        image: undefined,
+      }));
+    } catch (error) {
+      console.error("Unable to convert image to Base64:", error);
+
+      setSelectedImage(null);
+      setImagePreview("");
+      setFormErrors((previous) => ({
+        ...previous,
+        image: "Unable to process the selected image.",
+      }));
+    }
   };
 
   const handleFileInputChange = (
     event: ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0] ?? null;
-    handleImageSelection(file);
+    void handleImageSelection(file);
 
     event.target.value = "";
   };
@@ -428,7 +450,7 @@ export default function CarwashServices() {
     setIsDragging(false);
 
     const file = event.dataTransfer.files?.[0] ?? null;
-    handleImageSelection(file);
+    void handleImageSelection(file);
   };
 
   const handleSubmitService = async (
@@ -447,29 +469,32 @@ export default function CarwashServices() {
         title: form.title.trim(),
         description: form.description.trim(),
         price: Number(form.price),
+        image: imagePreview,
         features: [
           form.feature1.trim(),
           form.feature2.trim(),
         ],
+        featuresText: [
+          form.feature1.trim(),
+          form.feature2.trim(),
+        ].join(","),
       };
 
       /*
-       For API submission with image:
+       Base64 JSON API example:
 
-       const formData = new FormData();
-       formData.append("title", serviceData.title);
-       formData.append("description", serviceData.description);
-       formData.append("price", String(serviceData.price));
-       formData.append("features", JSON.stringify(serviceData.features));
-
-       if (selectedImage) {
-         formData.append("image", selectedImage);
-       }
+       const payload = {
+         title: serviceData.title,
+         description: serviceData.description,
+         price: serviceData.price,
+         image: serviceData.image,
+         features: serviceData.featuresText,
+       };
 
        if (formMode === "add") {
-         await createCarwashService(formData);
+         await createCarwashService(payload);
        } else if (selectedService) {
-         await updateCarwashService(selectedService.id, formData);
+         await updateCarwashService(selectedService.id, payload);
        }
       */
 
@@ -478,8 +503,11 @@ export default function CarwashServices() {
       if (formMode === "add") {
         const newService: Service = {
           id: crypto.randomUUID(),
-          ...serviceData,
-          imageUrl: imagePreview,
+          title: serviceData.title,
+          description: serviceData.description,
+          price: serviceData.price,
+          image: serviceData.image,
+          features: serviceData.features,
         };
 
         setServices((previous) => [
@@ -499,9 +527,11 @@ export default function CarwashServices() {
             service.id === selectedService.id
               ? {
                   ...service,
-                  ...serviceData,
-                  imageUrl:
-                    imagePreview || service.imageUrl,
+                  title: serviceData.title,
+                  description: serviceData.description,
+                  price: serviceData.price,
+                  features: serviceData.features,
+                  image: imagePreview || service.image,
                 }
               : service,
           ),
@@ -629,7 +659,7 @@ export default function CarwashServices() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
-              onClick={fetchServices}
+              onClick={getCarwashServices}
               disabled={isLoading}
               className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -741,9 +771,9 @@ export default function CarwashServices() {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                            {service.imageUrl ? (
+                            {service.image ? (
                               <img
-                                src={service.imageUrl}
+                                src={getBase64ImageSource(service.image)}
                                 alt={service.title}
                                 className="h-full w-full object-cover"
                               />
@@ -809,7 +839,7 @@ export default function CarwashServices() {
                                 onClick={() =>
                                   handleOpenViewModal(service)
                                 }
-                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
                               >
                                 <Eye size={16} />
                                 View
@@ -820,7 +850,7 @@ export default function CarwashServices() {
                                 onClick={() =>
                                   handleOpenEditModal(service)
                                 }
-                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
                               >
                                 <Edit3 size={16} />
                                 Edit
@@ -831,7 +861,7 @@ export default function CarwashServices() {
                                 onClick={() =>
                                   handleOpenDeleteModal(service)
                                 }
-                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
                               >
                                 <Trash2 size={16} />
                                 Delete
@@ -860,9 +890,9 @@ export default function CarwashServices() {
                 <article key={service.id} className="p-4">
                   <div className="mb-4 flex items-start gap-3">
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                      {service.imageUrl ? (
+                      {service.image ? (
                         <img
-                          src={service.imageUrl}
+                          src={getBase64ImageSource(service.image)}
                           alt={service.title}
                           className="h-full w-full object-cover"
                         />
@@ -1259,7 +1289,7 @@ function ServiceFormModal({
                       <button
                         type="button"
                         onClick={onRemoveImage}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
+                        className="flex h-9 w-9 items-center cursor-pointer justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -1399,7 +1429,7 @@ function ViewServiceModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
           >
             <X size={20} />
           </button>
@@ -1407,9 +1437,9 @@ function ViewServiceModal({
 
         <div className="max-h-[72vh] overflow-y-auto p-5 sm:p-6">
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-            {service.imageUrl ? (
+            {service.image ? (
               <img
-                src={service.imageUrl}
+                src={getBase64ImageSource(service.image)}
                 alt={service.title}
                 className="h-64 w-full object-cover"
               />
@@ -1466,16 +1496,6 @@ function ViewServiceModal({
             </div>
           </div>
         </div>
-
-        <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
-          >
-            Close
-          </button>
-        </div>
       </div>
     </div>,
     document.body,
@@ -1521,7 +1541,7 @@ function DeleteServiceModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+            className="inline-flex h-11 cursor-pointer flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -1530,7 +1550,7 @@ function DeleteServiceModal({
             type="button"
             onClick={onDelete}
             disabled={isSubmitting}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-red-300"
+            className="inline-flex h-11 cursor-pointer flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:bg-red-300"
           >
             {isSubmitting ? (
               <>
