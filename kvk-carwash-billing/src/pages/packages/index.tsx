@@ -170,7 +170,9 @@ export default function Packages() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
 
-  const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(
+    null,
+  );
   const [form, setForm] = useState<PackageForm>(initialForm);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
@@ -238,10 +240,7 @@ export default function Packages() {
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setOpenMenuId(null);
       }
     };
@@ -310,16 +309,22 @@ export default function Packages() {
   };
 
   const openEditModal = (item: PackageItem) => {
+    const regularTotalPrice = services
+      .filter((service) => item.serviceIds.includes(service.id))
+      .reduce((total, service) => total + service.price, 0);
+
     setFormMode("edit");
     setSelectedPackage(item);
+
     setForm({
       title: item.title,
       description: item.description,
       basPrice: String(item.basPrice),
-      pricesWithoutDiscounts: String(item.pricesWithoutDiscounts),
+      pricesWithoutDiscounts: String(regularTotalPrice),
       isActive: item.isActive,
       serviceIds: item.serviceIds,
     });
+
     setSelectedImage(null);
     setImagePreview(getImageSource(item.image));
     setFormErrors({});
@@ -344,13 +349,28 @@ export default function Packages() {
   };
 
   const toggleService = (serviceId: string) => {
-    setForm((previous) => ({
-      ...previous,
-      serviceIds: previous.serviceIds.includes(serviceId)
+    setForm((previous) => {
+      const updatedServiceIds = previous.serviceIds.includes(serviceId)
         ? previous.serviceIds.filter((id) => id !== serviceId)
-        : [...previous.serviceIds, serviceId],
+        : [...previous.serviceIds, serviceId];
+
+      const regularTotalPrice = services
+        .filter((service) => updatedServiceIds.includes(service.id))
+        .reduce((total, service) => total + service.price, 0);
+
+      return {
+        ...previous,
+        serviceIds: updatedServiceIds,
+        pricesWithoutDiscounts:
+          regularTotalPrice > 0 ? String(regularTotalPrice) : "",
+      };
+    });
+
+    setFormErrors((previous) => ({
+      ...previous,
+      serviceIds: undefined,
+      pricesWithoutDiscounts: undefined,
     }));
-    setFormErrors((previous) => ({ ...previous, serviceIds: undefined }));
   };
 
   const validateForm = () => {
@@ -377,17 +397,17 @@ export default function Packages() {
     }
 
     if (!form.pricesWithoutDiscounts.trim()) {
-      errors.pricesWithoutDiscounts = "Regular total price is required.";
+      errors.pricesWithoutDiscounts = "Select at least one service.";
     } else if (
       Number.isNaN(pricesWithoutDiscounts) ||
       pricesWithoutDiscounts <= 0
     ) {
-      errors.pricesWithoutDiscounts = "Enter a valid regular price.";
-    } else if (pricesWithoutDiscounts < basPrice) {
       errors.pricesWithoutDiscounts =
-        "Regular price cannot be lower than the package price.";
+        "Regular price must be greater than zero.";
+    } else if (basPrice > pricesWithoutDiscounts) {
+      errors.basPrice =
+        "Package price cannot be higher than the regular total price.";
     }
-
     if (form.serviceIds.length === 0) {
       errors.serviceIds = "Select at least one service.";
     }
@@ -457,12 +477,26 @@ export default function Packages() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!validateForm()) return;
+
+    const isValid = validateForm();
+
+    if (!isValid) {
+      setPageAlert({
+        visible: true,
+        variant: "warning",
+        title: "Invalid package price",
+        description:
+          "The package price cannot be higher than the regular total price of the selected services.",
+      });
+
+      return;
+    }
 
     try {
       setIsSubmitting(true);
 
       const payload = new FormData();
+
       payload.append("Title", form.title.trim());
       payload.append("Description", form.description.trim());
       payload.append("BasPrice", String(Number(form.basPrice)));
@@ -476,7 +510,6 @@ export default function Packages() {
         payload.append("Image", selectedImage);
       }
 
-      // ASP.NET Core binds repeated FormData keys to array<string>.
       form.serviceIds.forEach((serviceId) => {
         payload.append("ServiceIds", serviceId);
       });
@@ -501,6 +534,7 @@ export default function Packages() {
       await loadData();
     } catch (error) {
       console.error("Unable to save package:", error);
+
       setPageAlert({
         visible: true,
         variant: "error",
@@ -557,9 +591,7 @@ export default function Packages() {
     : 0;
 
   const showingFrom =
-    filteredPackages.length === 0
-      ? 0
-      : (currentPage - 1) * itemsPerPage + 1;
+    filteredPackages.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const showingTo = Math.min(
     currentPage * itemsPerPage,
     filteredPackages.length,
@@ -567,16 +599,18 @@ export default function Packages() {
 
   return (
     <main className="min-h-screen bg-slate-50/60">
-      {pageAlert.visible && (
-        <div className="fixed right-4 top-4 z-[99999] w-[calc(100%-2rem)] max-w-md">
-          <CustomAlert
-            alert={pageAlert}
-            onClose={() =>
-              setPageAlert((previous) => ({ ...previous, visible: false }))
-            }
-          />
-        </div>
-      )}
+      {pageAlert.visible &&
+        createPortal(
+          <div className="fixed right-4 top-4 z-[99999] w-[calc(100%-2rem)] max-w-md">
+            <CustomAlert
+              alert={pageAlert}
+              onClose={() =>
+                setPageAlert((previous) => ({ ...previous, visible: false }))
+              }
+            />
+          </div>,
+          document.body,
+        )}
 
       {(isLoading || isSubmitting) &&
         createPortal(
@@ -614,7 +648,10 @@ export default function Packages() {
               disabled={isLoading}
               className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-60"
             >
-              <RefreshCcw size={16} className={isLoading ? "animate-spin" : ""} />
+              <RefreshCcw
+                size={16}
+                className={isLoading ? "animate-spin" : ""}
+              />
               Refresh
             </button>
             <button
@@ -653,7 +690,10 @@ export default function Packages() {
         <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:max-w-md">
-              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search
+                size={18}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
               <input
                 type="text"
                 value={searchTerm}
@@ -699,7 +739,10 @@ export default function Packages() {
               <tbody className="divide-y divide-slate-100">
                 {paginatedPackages.length ? (
                   paginatedPackages.map((item) => (
-                    <tr key={item.id} className="transition hover:bg-slate-50/80">
+                    <tr
+                      key={item.id}
+                      className="transition hover:bg-slate-50/80"
+                    >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
@@ -899,9 +942,12 @@ export default function Packages() {
             <div className="flex flex-col gap-4 border-t border-slate-200 bg-slate-50/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <p className="text-sm text-slate-500">
-                  Showing <strong className="text-slate-700">{showingFrom}</strong> to{" "}
+                  Showing{" "}
+                  <strong className="text-slate-700">{showingFrom}</strong> to{" "}
                   <strong className="text-slate-700">{showingTo}</strong> of{" "}
-                  <strong className="text-slate-700">{filteredPackages.length}</strong>
+                  <strong className="text-slate-700">
+                    {filteredPackages.length}
+                  </strong>
                 </p>
                 <select
                   value={itemsPerPage}
@@ -920,7 +966,9 @@ export default function Packages() {
                 <PaginationButton
                   label="Previous"
                   disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
                 />
                 <span className="text-sm font-semibold text-slate-600">
                   {currentPage} / {totalPages}
@@ -1009,7 +1057,10 @@ type PackageFormModalProps = {
   discountAmount: number;
   discountPercentage: number;
   formatPrice: (price: number) => string;
-  onChange: <K extends keyof PackageForm>(field: K, value: PackageForm[K]) => void;
+  onChange: <K extends keyof PackageForm>(
+    field: K,
+    value: PackageForm[K],
+  ) => void;
   onToggleService: (serviceId: string) => void;
   onServiceSearchChange: (value: string) => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -1045,7 +1096,9 @@ function PackageFormModal({
   onSubmit,
 }: PackageFormModalProps) {
   const filteredServices = services.filter((service) =>
-    service.title.toLowerCase().includes(serviceSearchTerm.trim().toLowerCase()),
+    service.title
+      .toLowerCase()
+      .includes(serviceSearchTerm.trim().toLowerCase()),
   );
 
   return createPortal(
@@ -1063,7 +1116,9 @@ function PackageFormModal({
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">
-                {mode === "add" ? "Add Car Wash Package" : "Edit Car Wash Package"}
+                {mode === "add"
+                  ? "Add Car Wash Package"
+                  : "Edit Car Wash Package"}
               </h2>
               <p className="text-sm text-slate-500">
                 Add package details, pricing and included services.
@@ -1115,18 +1170,28 @@ function PackageFormModal({
                   <FormField
                     label="Regular Total Price"
                     value={form.pricesWithoutDiscounts}
-                    placeholder="Enter price without discounts"
+                    placeholder="Select services to calculate"
                     type="number"
                     required
+                    readOnly
                     error={errors.pricesWithoutDiscounts}
-                    onChange={(value) => onChange("pricesWithoutDiscounts", value)}
+                    onChange={() => {}}
                   />
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <PriceInfo title="Package price" value={formatPrice(Number(form.basPrice || 0))} />
-                  <PriceInfo title="Customer saves" value={formatPrice(discountAmount)} />
-                  <PriceInfo title="Discount" value={`${discountPercentage}%`} />
+                  <PriceInfo
+                    title="Package price"
+                    value={formatPrice(Number(form.basPrice || 0))}
+                  />
+                  <PriceInfo
+                    title="Customer saves"
+                    value={formatPrice(discountAmount)}
+                  />
+                  <PriceInfo
+                    title="Discount"
+                    value={`${discountPercentage}%`}
+                  />
                 </div>
 
                 <div>
@@ -1139,13 +1204,20 @@ function PackageFormModal({
                     </span>
                   </div>
 
-                  <div className={`overflow-hidden rounded-2xl border ${errors.serviceIds ? "border-red-300" : "border-slate-200"}`}>
+                  <div
+                    className={`overflow-hidden rounded-2xl border ${errors.serviceIds ? "border-red-300" : "border-slate-200"}`}
+                  >
                     <div className="relative border-b border-slate-200 bg-slate-50 p-3">
-                      <Search size={16} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Search
+                        size={16}
+                        className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
                       <input
                         type="text"
                         value={serviceSearchTerm}
-                        onChange={(event) => onServiceSearchChange(event.target.value)}
+                        onChange={(event) =>
+                          onServiceSearchChange(event.target.value)
+                        }
                         placeholder="Search available services..."
                         className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                       />
@@ -1155,7 +1227,9 @@ function PackageFormModal({
                       {filteredServices.length ? (
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           {filteredServices.map((service) => {
-                            const selected = form.serviceIds.includes(service.id);
+                            const selected = form.serviceIds.includes(
+                              service.id,
+                            );
                             return (
                               <button
                                 key={service.id}
@@ -1167,7 +1241,9 @@ function PackageFormModal({
                                     : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50"
                                 }`}
                               >
-                                <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selected ? "border-blue-900 bg-blue-900 text-white" : "border-slate-300"}`}>
+                                <div
+                                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selected ? "border-blue-900 bg-blue-900 text-white" : "border-slate-300"}`}
+                                >
                                   {selected && <Check size={13} />}
                                 </div>
                                 <div className="min-w-0 flex-1">
@@ -1204,11 +1280,20 @@ function PackageFormModal({
                   </label>
                   {imagePreview ? (
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                      <img src={imagePreview} alt="Package preview" className="h-60 w-full object-cover" />
+                      <img
+                        src={imagePreview}
+                        alt="Package preview"
+                        className="h-60 w-full object-cover"
+                      />
                       <div className="flex gap-2 border-t border-slate-200 bg-white p-3">
                         <label className="inline-flex h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                           <UploadCloud size={15} /> Replace
-                          <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={onFileChange} className="hidden" />
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/webp"
+                            onChange={onFileChange}
+                            className="hidden"
+                          />
                         </label>
                       </div>
                     </div>
@@ -1228,23 +1313,38 @@ function PackageFormModal({
                       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-900">
                         <UploadCloud size={23} />
                       </div>
-                      <p className="text-sm font-semibold text-slate-800">Drag and drop image</p>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Drag and drop image
+                      </p>
                       <p className="mt-1 text-xs leading-5 text-slate-500">
-                        PNG, JPG, JPEG or WEBP<br />Maximum size 5 MB
+                        PNG, JPG, JPEG or WEBP
+                        <br />
+                        Maximum size 5 MB
                       </p>
                       <label className="mt-4 inline-flex h-9 cursor-pointer items-center rounded-lg bg-blue-900 px-4 text-xs font-semibold text-white hover:bg-blue-700">
                         Browse Image
-                        <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={onFileChange} className="hidden" />
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          onChange={onFileChange}
+                          className="hidden"
+                        />
                       </label>
                     </div>
                   )}
-                  {errors.image && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.image}</p>}
+                  {errors.image && (
+                    <p className="mt-1.5 text-xs font-medium text-red-600">
+                      {errors.image}
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">Package Status</p>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Package Status
+                      </p>
                       <p className="mt-1 text-xs leading-5 text-slate-500">
                         Inactive packages will not be available to customers.
                       </p>
@@ -1256,7 +1356,9 @@ function PackageFormModal({
                       onClick={() => onChange("isActive", !form.isActive)}
                       className={`relative h-7 w-12 cursor-pointer shrink-0 rounded-full transition ${form.isActive ? "bg-blue-900" : "bg-slate-300"}`}
                     >
-                      <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${form.isActive ? "left-6" : "left-1"}`} />
+                      <span
+                        className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${form.isActive ? "left-6" : "left-1"}`}
+                      />
                     </button>
                   </div>
                 </div>
@@ -1265,11 +1367,29 @@ function PackageFormModal({
           </div>
 
           <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="h-11 cursor-pointer rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="h-11 cursor-pointer rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            >
               Cancel
             </button>
-            <button type="submit" disabled={isSubmitting} className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300">
-              {isSubmitting ? <><Loader2 size={17} className="animate-spin" /> Saving</> : <>{mode === "add" ? <Plus size={17} /> : <Check size={17} />}{mode === "add" ? "Add Package" : "Save Changes"}</>}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={17} className="animate-spin" /> Saving
+                </>
+              ) : (
+                <>
+                  {mode === "add" ? <Plus size={17} /> : <Check size={17} />}
+                  {mode === "add" ? "Add Package" : "Save Changes"}
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -1279,32 +1399,114 @@ function PackageFormModal({
   );
 }
 
-function ViewPackageModal({ item, formatPrice, onClose }: { item: PackageItem; formatPrice: (price: number) => string; onClose: () => void }) {
+function ViewPackageModal({
+  item,
+  formatPrice,
+  onClose,
+}: {
+  item: PackageItem;
+  formatPrice: (price: number) => string;
+  onClose: () => void;
+}) {
   const savings = Math.max(0, item.pricesWithoutDiscounts - item.basPrice);
-  const discount = item.pricesWithoutDiscounts > 0 ? Math.round((savings / item.pricesWithoutDiscounts) * 100) : 0;
+  const discount =
+    item.pricesWithoutDiscounts > 0
+      ? Math.round((savings / item.pricesWithoutDiscounts) * 100)
+      : 0;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
       <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-900 text-white"><Eye size={21} /></div>
-            <div><h2 className="text-xl font-bold text-slate-900">Package Details</h2><p className="text-sm text-slate-500">View included services and package pricing.</p></div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-900 text-white">
+              <Eye size={21} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Package Details
+              </h2>
+              <p className="text-sm text-slate-500">
+                View included services and package pricing.
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={20} /></button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+          >
+            <X size={20} />
+          </button>
         </div>
         <div className="max-h-[78vh] overflow-y-auto p-5 sm:p-6">
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-            {item.image ? <img src={getImageSource(item.image)} alt={item.title} className="h-72 w-full object-cover" /> : <div className="flex h-72 items-center justify-center text-slate-400"><ImageIcon size={40} /></div>}
+            {item.image ? (
+              <img
+                src={getImageSource(item.image)}
+                alt={item.title}
+                className="h-72 w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-72 items-center justify-center text-slate-400">
+                <ImageIcon size={40} />
+              </div>
+            )}
           </div>
           <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div><div className="flex items-center gap-2"><h3 className="text-2xl font-bold text-slate-900">{item.title}</h3><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{item.isActive ? "Active" : "Inactive"}</span></div><p className="mt-2 text-sm leading-7 text-slate-600">{item.description}</p></div>
-            <div className="shrink-0 text-right"><p className="text-sm text-slate-400 line-through">{formatPrice(item.pricesWithoutDiscounts)}</p><p className="text-xl font-bold text-emerald-700">{formatPrice(item.basPrice)}</p><p className="mt-1 text-xs font-semibold text-amber-600">Save {formatPrice(savings)} ({discount}%)</p></div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-2xl font-bold text-slate-900">
+                  {item.title}
+                </h3>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}
+                >
+                  {item.isActive ? "Active" : "Inactive"}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                {item.description}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-sm text-slate-400 line-through">
+                {formatPrice(item.pricesWithoutDiscounts)}
+              </p>
+              <p className="text-xl font-bold text-emerald-700">
+                {formatPrice(item.basPrice)}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-amber-600">
+                Save {formatPrice(savings)} ({discount}%)
+              </p>
+            </div>
           </div>
           <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
-            <h4 className="mb-4 flex items-center gap-2 font-bold text-slate-900"><Box size={18} className="text-blue-900" /> Included Services</h4>
+            <h4 className="mb-4 flex items-center gap-2 font-bold text-slate-900">
+              <Box size={18} className="text-blue-900" /> Included Services
+            </h4>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {item.services.map((service) => <div key={service.id} className="flex items-center gap-3 rounded-xl border border-blue-100 bg-white p-3"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-900 text-white"><Check size={14} /></div><div><p className="text-sm font-semibold text-slate-800">{service.title}</p><p className="text-xs text-slate-500">{formatPrice(service.price)}</p></div></div>)}
+              {item.services.map((service) => (
+                <div
+                  key={service.id}
+                  className="flex items-center gap-3 rounded-xl border border-blue-100 bg-white p-3"
+                >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-900 text-white">
+                    <Check size={14} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {service.title}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {formatPrice(service.price)}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1314,15 +1516,58 @@ function ViewPackageModal({ item, formatPrice, onClose }: { item: PackageItem; f
   );
 }
 
-function DeletePackageModal({ item, isSubmitting, onClose, onDelete }: { item: PackageItem; isSubmitting: boolean; onClose: () => void; onDelete: () => void }) {
+function DeletePackageModal({
+  item,
+  isSubmitting,
+  onClose,
+  onDelete,
+}: {
+  item: PackageItem;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+}) {
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600"><Trash2 size={25} /></div>
-        <div className="mt-4 text-center"><h2 className="text-xl font-bold text-slate-900">Delete Package</h2><p className="mt-2 text-sm leading-6 text-slate-500">Are you sure you want to delete <strong className="text-slate-800">{item.title}</strong>? This action cannot be undone.</p></div>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+          <Trash2 size={25} />
+        </div>
+        <div className="mt-4 text-center">
+          <h2 className="text-xl font-bold text-slate-900">Delete Package</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Are you sure you want to delete{" "}
+            <strong className="text-slate-800">{item.title}</strong>? This
+            action cannot be undone.
+          </p>
+        </div>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
-          <button type="button" onClick={onClose} disabled={isSubmitting} className="h-11 cursor-pointer flex-1 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancel</button>
-          <button type="button" onClick={onDelete} disabled={isSubmitting} className="inline-flex h-11 cursor-pointer flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300">{isSubmitting ? <><Loader2 size={16} className="animate-spin" />Deleting</> : <><Trash2 size={16} />Delete</>}</button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="h-11 cursor-pointer flex-1 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isSubmitting}
+            className="inline-flex h-11 cursor-pointer flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Deleting
+              </>
+            ) : (
+              <>
+                <Trash2 size={16} />
+                Delete
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>,
@@ -1330,35 +1575,218 @@ function DeletePackageModal({ item, isSubmitting, onClose, onDelete }: { item: P
   );
 }
 
-function FormField({ label, value, placeholder, error, required, type = "text", onChange }: { label: string; value: string; placeholder: string; error?: string; required?: boolean; type?: "text" | "number"; onChange: (value: string) => void }) {
-  return <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">{label}{required && <span className="ml-1 text-red-500">*</span>}</label><input type={type} min={type === "number" ? 1 : undefined} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className={`h-11 w-full rounded-xl border bg-white px-3.5 text-sm outline-none transition focus:ring-4 ${error ? "border-red-400 focus:border-red-500 focus:ring-red-100" : "border-slate-200 focus:border-blue-500 focus:ring-blue-100"}`} />{error && <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}</div>;
+function FormField({
+  label,
+  value,
+  placeholder,
+  error,
+  required,
+  type = "text",
+  readOnly = false,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  error?: string;
+  required?: boolean;
+  type?: "text" | "number";
+  readOnly?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+        {label}
+        {required && <span className="ml-1 text-red-500">*</span>}
+      </label>
+
+      <input
+        type={type}
+        min={type === "number" ? 1 : undefined}
+        value={value}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        onChange={(event) => onChange(event.target.value)}
+        className={`h-11 w-full rounded-xl border px-3.5 text-sm outline-none transition focus:ring-4 ${
+          readOnly
+            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-600"
+            : error
+              ? "border-red-400 bg-white focus:border-red-500 focus:ring-red-100"
+              : "border-slate-200 bg-white focus:border-blue-500 focus:ring-blue-100"
+        }`}
+      />
+
+      {error && (
+        <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>
+      )}
+    </div>
+  );
 }
 
-function FormTextArea({ label, value, placeholder, error, required, onChange }: { label: string; value: string; placeholder: string; error?: string; required?: boolean; onChange: (value: string) => void }) {
-  return <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">{label}{required && <span className="ml-1 text-red-500">*</span>}</label><textarea rows={5} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className={`w-full resize-none rounded-xl border bg-white px-3.5 py-3 text-sm outline-none transition focus:ring-4 ${error ? "border-red-400 focus:border-red-500 focus:ring-red-100" : "border-slate-200 focus:border-blue-500 focus:ring-blue-100"}`} />{error && <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}</div>;
+function FormTextArea({
+  label,
+  value,
+  placeholder,
+  error,
+  required,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  error?: string;
+  required?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+        {label}
+        {required && <span className="ml-1 text-red-500">*</span>}
+      </label>
+      <textarea
+        rows={5}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className={`w-full resize-none rounded-xl border bg-white px-3.5 py-3 text-sm outline-none transition focus:ring-4 ${error ? "border-red-400 focus:border-red-500 focus:ring-red-100" : "border-slate-200 focus:border-blue-500 focus:ring-blue-100"}`}
+      />
+      {error && (
+        <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>
+      )}
+    </div>
+  );
 }
 
-function SummaryCard({ title, value, icon, iconClassName, suffix = "" }: { title: string; value: number; icon: ReactNode; iconClassName: string; suffix?: string }) {
-  return <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClassName}`}>{icon}</div><div><p className="text-sm font-medium text-slate-500">{title}</p><p className="mt-0.5 text-2xl font-bold text-slate-900">{value.toLocaleString()}{suffix}</p></div></div>;
+function SummaryCard({
+  title,
+  value,
+  icon,
+  iconClassName,
+  suffix = "",
+}: {
+  title: string;
+  value: number;
+  icon: ReactNode;
+  iconClassName: string;
+  suffix?: string;
+}) {
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div
+        className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClassName}`}
+      >
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm font-medium text-slate-500">{title}</p>
+        <p className="mt-0.5 text-2xl font-bold text-slate-900">
+          {value.toLocaleString()}
+          {suffix}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function PriceInfo({ title, value }: { title: string; value: string }) {
-  return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-medium text-slate-500">{title}</p><p className="mt-1 text-sm font-bold text-slate-800">{value}</p></div>;
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-medium text-slate-500">{title}</p>
+      <p className="mt-1 text-sm font-bold text-slate-800">{value}</p>
+    </div>
+  );
 }
 
-function ActionButton({ icon, label, danger, onClick }: { icon: ReactNode; label: string; danger?: boolean; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${danger ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{icon}{label}</button>;
+function ActionButton({
+  icon,
+  label,
+  danger,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${danger ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
 }
 
-function PaginationButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
-  return <button type="button" disabled={disabled} onClick={onClick} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50">{label}</button>;
+function PaginationButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {label}
+    </button>
+  );
 }
 
 function EmptyState() {
-  return <div className="flex flex-col items-center justify-center px-4 py-16 text-center"><div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><PackageCheck size={26} /></div><h3 className="font-semibold text-slate-900">No packages found</h3><p className="mt-1 max-w-sm text-sm text-slate-500">No packages match the current search, or no car wash packages have been created yet.</p></div>;
+  return (
+    <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+        <PackageCheck size={26} />
+      </div>
+      <h3 className="font-semibold text-slate-900">No packages found</h3>
+      <p className="mt-1 max-w-sm text-sm text-slate-500">
+        No packages match the current search, or no car wash packages have been
+        created yet.
+      </p>
+    </div>
+  );
 }
 
-function CustomAlert({ alert, onClose }: { alert: AlertState; onClose: () => void }) {
-  const styles = { success: "border-emerald-200 bg-emerald-50 text-emerald-800", error: "border-red-200 bg-red-50 text-red-800", warning: "border-amber-200 bg-amber-50 text-amber-800", info: "border-blue-200 bg-blue-50 text-blue-800" };
-  return <div className={`flex items-start gap-3 rounded-2xl border p-4 shadow-lg ${styles[alert.variant]}`}><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div className="min-w-0 flex-1"><p className="font-semibold">{alert.title}</p><p className="mt-1 text-sm opacity-80">{alert.description}</p></div><button type="button" onClick={onClose} className="rounded-lg p-1 hover:bg-black/5"><X size={17} /></button></div>;
+function CustomAlert({
+  alert,
+  onClose,
+}: {
+  alert: AlertState;
+  onClose: () => void;
+}) {
+  const styles = {
+    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    error: "border-red-200 bg-red-50 text-red-800",
+    warning: "border-amber-200 bg-amber-50 text-amber-800",
+    info: "border-blue-200 bg-blue-50 text-blue-800",
+  };
+  return (
+    <div
+      className={`flex items-start gap-3 rounded-2xl border p-4 shadow-lg ${styles[alert.variant]}`}
+    >
+      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">{alert.title}</p>
+        <p className="mt-1 text-sm opacity-80">{alert.description}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-lg p-1 cursor-pointer hover:bg-black/5"
+      >
+        <X size={17} />
+      </button>
+    </div>
+  );
 }
