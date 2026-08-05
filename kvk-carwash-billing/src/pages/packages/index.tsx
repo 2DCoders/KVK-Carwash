@@ -774,7 +774,7 @@ export default function Packages() {
                                 previous === item.id ? null : item.id,
                               )
                             }
-                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700"
+                            className="flex h-9 w-9 items-center cursor-pointer justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700"
                           >
                             <MoreVertical size={18} />
                           </button>
@@ -1074,7 +1074,7 @@ function PackageFormModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
           >
             <X size={20} />
           </button>
@@ -1161,7 +1161,7 @@ function PackageFormModal({
                                 key={service.id}
                                 type="button"
                                 onClick={() => onToggleService(service.id)}
-                                className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
+                                className={`flex items-center cursor-pointer gap-3 rounded-xl border p-3 text-left transition ${
                                   selected
                                     ? "border-blue-300 bg-blue-50"
                                     : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50"
@@ -1210,13 +1210,6 @@ function PackageFormModal({
                           <UploadCloud size={15} /> Replace
                           <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={onFileChange} className="hidden" />
                         </label>
-                        <button
-                          type="button"
-                          onClick={onRemoveImage}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 size={15} />
-                        </button>
                       </div>
                     </div>
                   ) : (
@@ -1261,7 +1254,7 @@ function PackageFormModal({
                       role="switch"
                       aria-checked={form.isActive}
                       onClick={() => onChange("isActive", !form.isActive)}
-                      className={`relative h-7 w-12 shrink-0 rounded-full transition ${form.isActive ? "bg-blue-900" : "bg-slate-300"}`}
+                      className={`relative h-7 w-12 cursor-pointer shrink-0 rounded-full transition ${form.isActive ? "bg-blue-900" : "bg-slate-300"}`}
                     >
                       <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${form.isActive ? "left-6" : "left-1"}`} />
                     </button>
@@ -1272,10 +1265,10 @@ function PackageFormModal({
           </div>
 
           <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="h-11 cursor-pointer rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
               Cancel
             </button>
-            <button type="submit" disabled={isSubmitting} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300">
+            <button type="submit" disabled={isSubmitting} className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300">
               {isSubmitting ? <><Loader2 size={17} className="animate-spin" /> Saving</> : <>{mode === "add" ? <Plus size={17} /> : <Check size={17} />}{mode === "add" ? "Add Package" : "Save Changes"}</>}
             </button>
           </div>
@@ -1298,7 +1291,7 @@ function ViewPackageModal({ item, formatPrice, onClose }: { item: PackageItem; f
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-900 text-white"><Eye size={21} /></div>
             <div><h2 className="text-xl font-bold text-slate-900">Package Details</h2><p className="text-sm text-slate-500">View included services and package pricing.</p></div>
           </div>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={20} /></button>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={20} /></button>
         </div>
         <div className="max-h-[78vh] overflow-y-auto p-5 sm:p-6">
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
@@ -1328,8 +1321,8 @@ function DeletePackageModal({ item, isSubmitting, onClose, onDelete }: { item: P
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600"><Trash2 size={25} /></div>
         <div className="mt-4 text-center"><h2 className="text-xl font-bold text-slate-900">Delete Package</h2><p className="mt-2 text-sm leading-6 text-slate-500">Are you sure you want to delete <strong className="text-slate-800">{item.title}</strong>? This action cannot be undone.</p></div>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
-          <button type="button" onClick={onClose} disabled={isSubmitting} className="h-11 flex-1 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancel</button>
-          <button type="button" onClick={onDelete} disabled={isSubmitting} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300">{isSubmitting ? <><Loader2 size={16} className="animate-spin" />Deleting</> : <><Trash2 size={16} />Delete</>}</button>
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="h-11 cursor-pointer flex-1 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancel</button>
+          <button type="button" onClick={onDelete} disabled={isSubmitting} className="inline-flex h-11 cursor-pointer flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300">{isSubmitting ? <><Loader2 size={16} className="animate-spin" />Deleting</> : <><Trash2 size={16} />Delete</>}</button>
         </div>
       </div>
     </div>,
@@ -1354,7 +1347,7 @@ function PriceInfo({ title, value }: { title: string; value: string }) {
 }
 
 function ActionButton({ icon, label, danger, onClick }: { icon: ReactNode; label: string; danger?: boolean; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${danger ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{icon}{label}</button>;
+  return <button type="button" onClick={onClick} className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${danger ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{icon}{label}</button>;
 }
 
 function PaginationButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
