@@ -189,6 +189,19 @@ export default function Packages() {
     description: "",
   });
 
+  useEffect(() => {
+  if (!pageAlert.visible) return;
+
+  const timer = setTimeout(() => {
+    setPageAlert((prev) => ({
+      ...prev,
+      visible: false,
+    }));
+  }, 2000);
+
+  return () => clearTimeout(timer);
+}, [pageAlert.visible]);
+
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const formatPrice = (price: number) =>
@@ -1771,6 +1784,7 @@ function CustomAlert({
     warning: "border-amber-200 bg-amber-50 text-amber-800",
     info: "border-blue-200 bg-blue-50 text-blue-800",
   };
+  
   return (
     <div
       className={`flex items-start gap-3 rounded-2xl border p-4 shadow-lg ${styles[alert.variant]}`}
