@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type {
-  ChangeEvent,
-  DragEvent,
-  FormEvent,
-  ReactNode,
-} from "react";
+import type { ChangeEvent, DragEvent, FormEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
@@ -24,7 +19,12 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { getCarServices } from "@/services/carwash-services-api";
+import {
+  createCarService,
+  deleteCarService,
+  getCarServices,
+  updateCarService,
+} from "@/services/carwash-services-api";
 
 type Service = {
   id: string;
@@ -54,12 +54,9 @@ const getBase64ImageSource = (image?: string | null) => {
   return `data:${DEFAULT_IMAGE_MIME_TYPE};base64,${value}`;
 };
 
-
 const normalizeFeatures = (features: unknown): string[] => {
   if (Array.isArray(features)) {
-    return features
-      .map((feature) => String(feature).trim())
-      .filter(Boolean);
+    return features.map((feature) => String(feature).trim()).filter(Boolean);
   }
 
   if (typeof features === "string") {
@@ -106,11 +103,12 @@ type ServiceForm = {
   title: string;
   description: string;
   price: string;
-  feature1: string;
-  feature2: string;
+  features: string[];
 };
 
-type FormErrors = Partial<Record<keyof ServiceForm | "image", string>>;
+type FormErrors = Partial<
+  Record<"title" | "description" | "price" | "features" | "image", string>
+>;
 
 type AlertState = {
   visible: boolean;
@@ -123,8 +121,7 @@ const initialForm: ServiceForm = {
   title: "",
   description: "",
   price: "",
-  feature1: "",
-  feature2: "",
+  features: [""],
 };
 
 export default function CarwashServices() {
@@ -136,8 +133,7 @@ export default function CarwashServices() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [selectedService, setSelectedService] =
-    useState<Service | null>(null);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -168,9 +164,7 @@ export default function CarwashServices() {
 
       const response = await getCarServices();
       setServices(
-        Array.isArray(response)
-          ? response.map(normalizeService)
-          : [],
+        Array.isArray(response) ? response.map(normalizeService) : [],
       );
     } catch (error) {
       console.error("Unable to load car wash services:", error);
@@ -193,10 +187,7 @@ export default function CarwashServices() {
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setOpenMenuId(null);
       }
     };
@@ -232,16 +223,11 @@ export default function CarwashServices() {
   const paginatedServices = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
 
-    return filteredServices.slice(
-      startIndex,
-      startIndex + itemsPerPage,
-    );
+    return filteredServices.slice(startIndex, startIndex + itemsPerPage);
   }, [currentPage, filteredServices, itemsPerPage]);
 
   const showingFrom =
-    filteredServices.length === 0
-      ? 0
-      : (currentPage - 1) * itemsPerPage + 1;
+    filteredServices.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
 
   const showingTo = Math.min(
     currentPage * itemsPerPage,
@@ -285,8 +271,8 @@ export default function CarwashServices() {
       title: service.title,
       description: service.description,
       price: String(service.price),
-      feature1: service.features[0] ?? "",
-      feature2: service.features[1] ?? "",
+      features:
+        service.features.length > 0 ? service.features.slice(0, 5) : [""],
     });
 
     setSelectedImage(null);
@@ -317,7 +303,7 @@ export default function CarwashServices() {
   };
 
   const handleFormChange = (
-    field: keyof ServiceForm,
+    field: "title" | "description" | "price",
     value: string,
   ) => {
     setForm((previous) => ({
@@ -333,6 +319,55 @@ export default function CarwashServices() {
     }
   };
 
+  const handleFeatureChange = (index: number, value: string) => {
+    setForm((previous) => ({
+      ...previous,
+      features: previous.features.map((feature, featureIndex) =>
+        featureIndex === index ? value : feature,
+      ),
+    }));
+
+    if (formErrors.features) {
+      setFormErrors((previous) => ({
+        ...previous,
+        features: undefined,
+      }));
+    }
+  };
+
+  const handleAddFeature = () => {
+    setForm((previous) => {
+      if (previous.features.length >= 5) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        features: [...previous.features, ""],
+      };
+    });
+  };
+
+  const handleRemoveFeature = (index: number) => {
+    setForm((previous) => {
+      if (previous.features.length <= 1) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        features: previous.features.filter(
+          (_, featureIndex) => featureIndex !== index,
+        ),
+      };
+    });
+
+    setFormErrors((previous) => ({
+      ...previous,
+      features: undefined,
+    }));
+  };
+
   const validateForm = () => {
     const errors: FormErrors = {};
 
@@ -345,8 +380,7 @@ export default function CarwashServices() {
     if (!form.description.trim()) {
       errors.description = "Description is required.";
     } else if (form.description.trim().length < 10) {
-      errors.description =
-        "Description must contain at least 10 characters.";
+      errors.description = "Description must contain at least 10 characters.";
     }
 
     const price = Number(form.price);
@@ -357,19 +391,17 @@ export default function CarwashServices() {
       errors.price = "Enter a valid price greater than zero.";
     }
 
-    if (!form.feature1.trim()) {
-      errors.feature1 = "Feature 1 is required.";
+    const normalizedFeatures = form.features
+      .map((feature) => feature.trim())
+      .filter(Boolean);
+
+    if (normalizedFeatures.length === 0) {
+      errors.features = "Please add at least one feature.";
+    } else if (normalizedFeatures.length > 5) {
+      errors.features = "Maximum 5 features are allowed.";
     }
 
-    if (!form.feature2.trim()) {
-      errors.feature2 = "Feature 2 is required.";
-    }
-
-    if (
-      formMode === "add" &&
-      !selectedImage &&
-      !imagePreview
-    ) {
+    if (formMode === "add" && !selectedImage && !imagePreview) {
       errors.image = "Service image is required.";
     }
 
@@ -436,9 +468,7 @@ export default function CarwashServices() {
     }
   };
 
-  const handleFileInputChange = (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleFileInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     void handleImageSelection(file);
 
@@ -453,9 +483,7 @@ export default function CarwashServices() {
     void handleImageSelection(file);
   };
 
-  const handleSubmitService = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const handleSubmitService = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!validateForm()) {
@@ -465,55 +493,30 @@ export default function CarwashServices() {
     try {
       setIsSubmitting(true);
 
+      const normalizedFeatures = form.features
+        .map((feature) => feature.trim())
+        .filter(Boolean);
+
       const serviceData = {
         title: form.title.trim(),
         description: form.description.trim(),
         price: Number(form.price),
         image: imagePreview,
-        features: [
-          form.feature1.trim(),
-          form.feature2.trim(),
-        ],
-        featuresText: [
-          form.feature1.trim(),
-          form.feature2.trim(),
-        ].join(","),
+        features: normalizedFeatures,
       };
 
-      /*
-       Base64 JSON API example:
+      const payload = new FormData();
+      payload.append("Title", serviceData.title);
+      payload.append("Description", serviceData.description);
+      payload.append("Price", String(serviceData.price));
+      payload.append("Features", normalizedFeatures.join(","));
 
-       const payload = {
-         title: serviceData.title,
-         description: serviceData.description,
-         price: serviceData.price,
-         image: serviceData.image,
-         features: serviceData.featuresText,
-       };
-
-       if (formMode === "add") {
-         await createCarwashService(payload);
-       } else if (selectedService) {
-         await updateCarwashService(selectedService.id, payload);
-       }
-      */
-
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      if (selectedImage) {
+        payload.append("Image", selectedImage);
+      }
 
       if (formMode === "add") {
-        const newService: Service = {
-          id: crypto.randomUUID(),
-          title: serviceData.title,
-          description: serviceData.description,
-          price: serviceData.price,
-          image: serviceData.image,
-          features: serviceData.features,
-        };
-
-        setServices((previous) => [
-          newService,
-          ...previous,
-        ]);
+        await createCarService(payload);
 
         setPageAlert({
           visible: true,
@@ -522,20 +525,9 @@ export default function CarwashServices() {
           description: `${serviceData.title} was added successfully.`,
         });
       } else if (selectedService) {
-        setServices((previous) =>
-          previous.map((service) =>
-            service.id === selectedService.id
-              ? {
-                  ...service,
-                  title: serviceData.title,
-                  description: serviceData.description,
-                  price: serviceData.price,
-                  features: serviceData.features,
-                  image: imagePreview || service.image,
-                }
-              : service,
-          ),
-        );
+        
+        payload.append("Id", selectedService.id);
+        await updateCarService(payload);
 
         setPageAlert({
           visible: true,
@@ -545,7 +537,10 @@ export default function CarwashServices() {
         });
       }
 
-      handleCloseFormModal();
+      await getCarwashServices();
+      setIsFormModalOpen(false);
+      setSelectedService(null);
+      resetForm();
     } catch (error) {
       console.error("Unable to save service:", error);
 
@@ -553,8 +548,7 @@ export default function CarwashServices() {
         visible: true,
         variant: "error",
         title: "Unable to save service",
-        description:
-          "An error occurred while saving the service.",
+        description: "An error occurred while saving the service.",
       });
     } finally {
       setIsSubmitting(false);
@@ -567,20 +561,7 @@ export default function CarwashServices() {
     try {
       setIsSubmitting(true);
 
-      /*
-       Replace with your API call:
-
-       await deleteCarwashService(selectedService.id);
-      */
-
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      setServices((previous) =>
-        previous.filter(
-          (service) => service.id !== selectedService.id,
-        ),
-      );
-
+      await deleteCarService(selectedService.id);
       setPageAlert({
         visible: true,
         variant: "success",
@@ -597,17 +578,17 @@ export default function CarwashServices() {
         visible: true,
         variant: "error",
         title: "Unable to delete service",
-        description:
-          "An error occurred while deleting the service.",
+        description: "An error occurred while deleting the service.",
       });
     } finally {
       setIsSubmitting(false);
+      getCarwashServices();
     }
   };
 
   return (
     <main className="min-h-screen bg-slate-50/60">
-      {pageAlert.visible && (
+      {pageAlert.visible && createPortal(
         <div className="fixed right-4 top-4 z-[99999] w-[calc(100%-2rem)] max-w-md">
           <CustomAlert
             alert={pageAlert}
@@ -618,7 +599,8 @@ export default function CarwashServices() {
               }))
             }
           />
-        </div>
+        </div>,
+        document.body,
       )}
 
       {(isLoading || isSubmitting) &&
@@ -628,9 +610,7 @@ export default function CarwashServices() {
               <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/30 border-t-white" />
 
               <p className="text-sm font-medium text-white">
-                {isSubmitting
-                  ? "Processing..."
-                  : "Loading services..."}
+                {isSubmitting ? "Processing..." : "Loading services..."}
               </p>
             </div>
           </div>,
@@ -696,8 +676,7 @@ export default function CarwashServices() {
               services.length > 0
                 ? Math.round(
                     services.reduce(
-                      (total, service) =>
-                        total + service.price,
+                      (total, service) => total + service.price,
                       0,
                     ) / services.length,
                   )
@@ -811,19 +790,13 @@ export default function CarwashServices() {
                       <td className="relative px-5 py-4">
                         <div
                           className="flex justify-end"
-                          ref={
-                            openMenuId === service.id
-                              ? menuRef
-                              : null
-                          }
+                          ref={openMenuId === service.id ? menuRef : null}
                         >
                           <button
                             type="button"
                             onClick={() =>
                               setOpenMenuId((previous) =>
-                                previous === service.id
-                                  ? null
-                                  : service.id,
+                                previous === service.id ? null : service.id,
                               )
                             }
                             className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700"
@@ -836,9 +809,7 @@ export default function CarwashServices() {
                             <div className="absolute right-5 top-14 z-50 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleOpenViewModal(service)
-                                }
+                                onClick={() => handleOpenViewModal(service)}
                                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
                               >
                                 <Eye size={16} />
@@ -847,9 +818,7 @@ export default function CarwashServices() {
 
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleOpenEditModal(service)
-                                }
+                                onClick={() => handleOpenEditModal(service)}
                                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
                               >
                                 <Edit3 size={16} />
@@ -858,9 +827,7 @@ export default function CarwashServices() {
 
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleOpenDeleteModal(service)
-                                }
+                                onClick={() => handleOpenDeleteModal(service)}
                                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
                               >
                                 <Trash2 size={16} />
@@ -918,9 +885,7 @@ export default function CarwashServices() {
                         type="button"
                         onClick={() =>
                           setOpenMenuId((previous) =>
-                            previous === service.id
-                              ? null
-                              : service.id,
+                            previous === service.id ? null : service.id,
                           )
                         }
                         className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500"
@@ -932,9 +897,7 @@ export default function CarwashServices() {
                         <div className="absolute right-0 top-11 z-50 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
                           <button
                             type="button"
-                            onClick={() =>
-                              handleOpenViewModal(service)
-                            }
+                            onClick={() => handleOpenViewModal(service)}
                             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700"
                           >
                             <Eye size={16} />
@@ -943,9 +906,7 @@ export default function CarwashServices() {
 
                           <button
                             type="button"
-                            onClick={() =>
-                              handleOpenEditModal(service)
-                            }
+                            onClick={() => handleOpenEditModal(service)}
                             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700"
                           >
                             <Edit3 size={16} />
@@ -954,9 +915,7 @@ export default function CarwashServices() {
 
                           <button
                             type="button"
-                            onClick={() =>
-                              handleOpenDeleteModal(service)
-                            }
+                            onClick={() => handleOpenDeleteModal(service)}
                             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                           >
                             <Trash2 size={16} />
@@ -1009,9 +968,7 @@ export default function CarwashServices() {
                     id="service-items-per-page"
                     value={itemsPerPage}
                     onChange={(event) => {
-                      setItemsPerPage(
-                        Number(event.target.value),
-                      );
+                      setItemsPerPage(Number(event.target.value));
                       setCurrentPage(1);
                     }}
                     className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -1027,9 +984,7 @@ export default function CarwashServices() {
                 <button
                   type="button"
                   onClick={() =>
-                    setCurrentPage((previous) =>
-                      Math.max(previous - 1, 1),
-                    )
+                    setCurrentPage((previous) => Math.max(previous - 1, 1))
                   }
                   disabled={currentPage === 1}
                   className="inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1079,6 +1034,9 @@ export default function CarwashServices() {
           isDragging={isDragging}
           isSubmitting={isSubmitting}
           onChange={handleFormChange}
+          onFeatureChange={handleFeatureChange}
+          onAddFeature={handleAddFeature}
+          onRemoveFeature={handleRemoveFeature}
           onFileChange={handleFileInputChange}
           onDrop={handleDrop}
           onDragOver={(event) => {
@@ -1119,13 +1077,11 @@ type ServiceFormModalProps = {
   imagePreview: string;
   isDragging: boolean;
   isSubmitting: boolean;
-  onChange: (
-    field: keyof ServiceForm,
-    value: string,
-  ) => void;
-  onFileChange: (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => void;
+  onChange: (field: "title" | "description" | "price", value: string) => void;
+  onFeatureChange: (index: number, value: string) => void;
+  onAddFeature: () => void;
+  onRemoveFeature: (index: number) => void;
+  onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDragLeave: () => void;
@@ -1142,6 +1098,9 @@ function ServiceFormModal({
   isDragging,
   isSubmitting,
   onChange,
+  onFeatureChange,
+  onAddFeature,
+  onRemoveFeature,
   onFileChange,
   onDrop,
   onDragOver,
@@ -1163,11 +1122,7 @@ function ServiceFormModal({
         <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-900 text-white">
-              {mode === "add" ? (
-                <Plus size={21} />
-              ) : (
-                <Edit3 size={20} />
-              )}
+              {mode === "add" ? <Plus size={21} /> : <Edit3 size={20} />}
             </div>
 
             <div>
@@ -1193,10 +1148,7 @@ function ServiceFormModal({
           </button>
         </div>
 
-        <form
-          onSubmit={onSubmit}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="overflow-y-auto px-5 py-5 sm:px-6">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_250px]">
               <div className="space-y-4">
@@ -1206,9 +1158,7 @@ function ServiceFormModal({
                   placeholder="Enter service title"
                   required
                   error={errors.title}
-                  onChange={(value) =>
-                    onChange("title", value)
-                  }
+                  onChange={(value) => onChange("title", value)}
                 />
 
                 <FormTextArea
@@ -1217,9 +1167,7 @@ function ServiceFormModal({
                   placeholder="Enter service description"
                   required
                   error={errors.description}
-                  onChange={(value) =>
-                    onChange("description", value)
-                  }
+                  onChange={(value) => onChange("description", value)}
                 />
 
                 <FormField
@@ -1229,33 +1177,83 @@ function ServiceFormModal({
                   type="number"
                   required
                   error={errors.price}
-                  onChange={(value) =>
-                    onChange("price", value)
-                  }
+                  onChange={(value) => onChange("price", value)}
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="Feature 1"
-                    value={form.feature1}
-                    placeholder="Enter first feature"
-                    required
-                    error={errors.feature1}
-                    onChange={(value) =>
-                      onChange("feature1", value)
-                    }
-                  />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700">
+                        Features
+                        <span className="ml-1 text-red-500">*</span>
+                      </label>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Add between 1 and 5 service features.
+                      </p>
+                    </div>
 
-                  <FormField
-                    label="Feature 2"
-                    value={form.feature2}
-                    placeholder="Enter second feature"
-                    required
-                    error={errors.feature2}
-                    onChange={(value) =>
-                      onChange("feature2", value)
-                    }
-                  />
+                    <button
+                      type="button"
+                      onClick={onAddFeature}
+                      disabled={form.features.length >= 5}
+                      className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-900 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      <Plus size={14} />
+                      Add Feature
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {form.features.map((feature, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <span className="pointer-events-none absolute left-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-50 text-[10px] font-bold text-blue-900">
+                            {index + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={feature}
+                            maxLength={100}
+                            placeholder={`Enter feature ${index + 1}`}
+                            onChange={(event) =>
+                              onFeatureChange(index, event.target.value)
+                            }
+                            className={`h-11 w-full rounded-xl border bg-white pl-10 pr-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
+                              errors.features
+                                ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                                : "border-slate-200 focus:border-blue-500 focus:ring-blue-100"
+                            }`}
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => onRemoveFeature(index)}
+                          disabled={form.features.length === 1}
+                          aria-label={`Remove feature ${index + 1}`}
+                          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-200 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    {errors.features ? (
+                      <p className="text-xs font-medium text-red-600">
+                        {errors.features}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500">
+                        Features are submitted as a comma-separated string.
+                      </p>
+                    )}
+
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                      {form.features.length}/5
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1277,7 +1275,6 @@ function ServiceFormModal({
                       <label className="inline-flex h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
                         <UploadCloud size={15} />
                         Replace
-
                         <input
                           type="file"
                           accept="image/png,image/jpeg,image/jpg,image/webp"
@@ -1285,14 +1282,6 @@ function ServiceFormModal({
                           className="hidden"
                         />
                       </label>
-
-                      <button
-                        type="button"
-                        onClick={onRemoveImage}
-                        className="flex h-9 w-9 items-center cursor-pointer justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
-                      >
-                        <Trash2 size={15} />
-                      </button>
                     </div>
                   </div>
                 ) : (
@@ -1324,7 +1313,6 @@ function ServiceFormModal({
 
                     <label className="mt-4 inline-flex h-9 cursor-pointer items-center justify-center rounded-lg bg-blue-900 px-4 text-xs font-semibold text-white transition hover:bg-blue-700">
                       Browse Image
-
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/jpg,image/webp"
@@ -1361,22 +1349,13 @@ function ServiceFormModal({
             >
               {isSubmitting ? (
                 <>
-                  <Loader2
-                    size={17}
-                    className="animate-spin"
-                  />
+                  <Loader2 size={17} className="animate-spin" />
                   Saving
                 </>
               ) : (
                 <>
-                  {mode === "add" ? (
-                    <Plus size={17} />
-                  ) : (
-                    <Check size={17} />
-                  )}
-                  {mode === "add"
-                    ? "Add Service"
-                    : "Save Changes"}
+                  {mode === "add" ? <Plus size={17} /> : <Check size={17} />}
+                  {mode === "add" ? "Add Service" : "Save Changes"}
                 </>
               )}
             </button>
@@ -1468,14 +1447,9 @@ function ViewServiceModal({
 
           <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
             <div className="mb-4 flex items-center gap-2">
-              <Sparkles
-                size={18}
-                className="text-blue-900"
-              />
+              <Sparkles size={18} className="text-blue-900" />
 
-              <h4 className="font-bold text-slate-900">
-                Service Features
-              </h4>
+              <h4 className="font-bold text-slate-900">Service Features</h4>
             </div>
 
             <div className="space-y-3">
@@ -1488,9 +1462,7 @@ function ViewServiceModal({
                     <Check size={13} />
                   </div>
 
-                  <p className="text-sm leading-6 text-slate-700">
-                    {feature}
-                  </p>
+                  <p className="text-sm leading-6 text-slate-700">{feature}</p>
                 </div>
               ))}
             </div>
@@ -1523,9 +1495,7 @@ function DeleteServiceModal({
         </div>
 
         <div className="mt-4 text-center">
-          <h2 className="text-xl font-bold text-slate-900">
-            Delete Service
-          </h2>
+          <h2 className="text-xl font-bold text-slate-900">Delete Service</h2>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
             Are you sure you want to delete{" "}
@@ -1554,10 +1524,7 @@ function DeleteServiceModal({
           >
             {isSubmitting ? (
               <>
-                <Loader2
-                  size={16}
-                  className="animate-spin"
-                />
+                <Loader2 size={16} className="animate-spin" />
                 Deleting
               </>
             ) : (
@@ -1598,9 +1565,7 @@ function FormField({
       <label className="mb-1.5 block text-sm font-semibold text-slate-700">
         {label}
 
-        {required && (
-          <span className="ml-1 text-red-500">*</span>
-        )}
+        {required && <span className="ml-1 text-red-500">*</span>}
       </label>
 
       <input
@@ -1608,9 +1573,7 @@ function FormField({
         value={value}
         min={type === "number" ? 1 : undefined}
         placeholder={placeholder}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
+        onChange={(event) => onChange(event.target.value)}
         className={`h-11 w-full rounded-xl border bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-100"
@@ -1619,9 +1582,7 @@ function FormField({
       />
 
       {error && (
-        <p className="mt-1.5 text-xs font-medium text-red-600">
-          {error}
-        </p>
+        <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>
       )}
     </div>
   );
@@ -1649,18 +1610,14 @@ function FormTextArea({
       <label className="mb-1.5 block text-sm font-semibold text-slate-700">
         {label}
 
-        {required && (
-          <span className="ml-1 text-red-500">*</span>
-        )}
+        {required && <span className="ml-1 text-red-500">*</span>}
       </label>
 
       <textarea
         rows={5}
         value={value}
         placeholder={placeholder}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
+        onChange={(event) => onChange(event.target.value)}
         className={`w-full resize-none rounded-xl border bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-100"
@@ -1669,9 +1626,7 @@ function FormTextArea({
       />
 
       {error && (
-        <p className="mt-1.5 text-xs font-medium text-red-600">
-          {error}
-        </p>
+        <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>
       )}
     </div>
   );
@@ -1701,14 +1656,10 @@ function SummaryCard({
       </div>
 
       <div>
-        <p className="text-sm font-medium text-slate-500">
-          {title}
-        </p>
+        <p className="text-sm font-medium text-slate-500">{title}</p>
 
         <p className="mt-0.5 text-2xl font-bold text-slate-900">
-          {isPrice
-            ? `LKR ${value.toLocaleString()}`
-            : value}
+          {isPrice ? `LKR ${value.toLocaleString()}` : value}
         </p>
       </div>
     </div>
@@ -1722,13 +1673,11 @@ function EmptyState() {
         <CarFront size={26} />
       </div>
 
-      <h3 className="font-semibold text-slate-900">
-        No services found
-      </h3>
+      <h3 className="font-semibold text-slate-900">No services found</h3>
 
       <p className="mt-1 max-w-sm text-sm text-slate-500">
-        No services match the current search, or no car wash
-        services have been created yet.
+        No services match the current search, or no car wash services have been
+        created yet.
       </p>
     </div>
   );
@@ -1739,16 +1688,11 @@ type CustomAlertProps = {
   onClose: () => void;
 };
 
-function CustomAlert({
-  alert,
-  onClose,
-}: CustomAlertProps) {
+function CustomAlert({ alert, onClose }: CustomAlertProps) {
   const styles = {
-    success:
-      "border-emerald-200 bg-emerald-50 text-emerald-800",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
     error: "border-red-200 bg-red-50 text-red-800",
-    warning:
-      "border-amber-200 bg-amber-50 text-amber-800",
+    warning: "border-amber-200 bg-amber-50 text-amber-800",
     info: "border-blue-200 bg-blue-50 text-blue-800",
   };
 
@@ -1761,15 +1705,13 @@ function CustomAlert({
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{alert.title}</p>
 
-        <p className="mt-1 text-sm opacity-80">
-          {alert.description}
-        </p>
+        <p className="mt-1 text-sm opacity-80">{alert.description}</p>
       </div>
 
       <button
         type="button"
         onClick={onClose}
-        className="shrink-0 rounded-lg p-1 transition hover:bg-black/5"
+        className="shrink-0 cursor-pointer rounded-lg p-1 transition hover:bg-black/5"
       >
         <X size={17} />
       </button>

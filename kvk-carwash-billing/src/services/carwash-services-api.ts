@@ -25,3 +25,47 @@ export const getCarServices = async () => {
     throw error;
   }
 };
+
+export const createCarService = async (serviceData: FormData) => {
+  try {
+    const token = getToken();
+    const response = await axios.post(`${CAR_API_URL}`, serviceData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateCarService = async (serviceData: FormData) => {
+  try {
+    const token = getToken();
+    const response = await axios.put(`${CAR_API_URL}`, serviceData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const deleteCarService = async (serviceId: string) => {
+  try {
+    const token = getToken();
+    const response = await axios.delete(`${CAR_API_URL}${serviceId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
