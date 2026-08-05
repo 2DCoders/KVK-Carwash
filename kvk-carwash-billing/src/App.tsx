@@ -1,11 +1,11 @@
 import { Route, Routes, Navigate } from "react-router-dom"
 import Login from "./pages/login"
-import Payments from "./pages/payments"
 import Reports from "./pages/reports"
 import SettingsPage from "./pages/settings"
 import AdminLayout from "./layouts/admin-layout"
 import Dayend from "./pages/dayend"
 import CarwashServices from "./pages/services"
+import Packages from "./pages/packages"
 
 function App() {
   return (
@@ -14,7 +14,7 @@ function App() {
       
       {/* Admin Dashboard Routes */}
       <Route element={<AdminLayout><CarwashServices /></AdminLayout>} path="/services" />
-      <Route element={<AdminLayout><Payments /></AdminLayout>} path="/payments" />
+      <Route element={<AdminLayout><Packages /></AdminLayout>} path="/packages" />
       <Route element={<AdminLayout><Dayend /></AdminLayout>} path="/dayend" />
       <Route element={<AdminLayout><Reports /></AdminLayout>} path="/reports" />
       <Route element={<AdminLayout><SettingsPage /></AdminLayout>} path="/settings" />
