@@ -1,17 +1,20 @@
 import { getAllCarPackages } from "@/services/carwash-packages-api";
-import { pay } from "@/services/payments-api";
+import { getPayments, pay } from "@/services/payments-api";
 
 import {
+  ArrowLeft,
   BadgePercent,
   Banknote,
   CarFront,
   Check,
   ChevronDown,
   CreditCard,
+  Eye,
   Info,
   Loader2,
   Package,
   Plus,
+  ReceiptText,
   RefreshCcw,
   Search,
   ShoppingCart,
@@ -32,7 +35,7 @@ import {
 import { createPortal } from "react-dom";
 
 /* =========================================================
-   Types
+   Package / Service Types
    ========================================================= */
 
 type CarService = {
@@ -60,6 +63,52 @@ type PackagesResponse = {
   allServices: CarService[];
   packagesWithServices: CarPackage[];
 };
+
+/* =========================================================
+   Payment Response Types
+   ========================================================= */
+
+type PaymentPackage = {
+  carWashPackageId: string;
+  packageName: string;
+  packagePrice: number;
+};
+
+type PaymentService = {
+  carWashServiceId: string;
+  serviceName: string;
+  servicePrice: number;
+};
+
+type PaymentRecord = {
+  carWashOrderId: string;
+  orderNumber: string;
+  orderDate: string;
+
+  customerName: string;
+  customerPhone: string;
+
+  vehicleType: number;
+  vehicleNumber: string;
+
+  totalMinutesSpent: number;
+
+  subTotalAmount: number;
+  discount: number;
+  discountedTotalAmount: number;
+
+  isPaid: boolean;
+
+  paymentMethod: number;
+  carWashOrderStatus: number;
+
+  packages: PaymentPackage[];
+  services: PaymentService[];
+};
+
+/* =========================================================
+   Form Types
+   ========================================================= */
 
 type PaymentForm = {
   customerName: string;
@@ -102,27 +151,60 @@ const initialForm: PaymentForm = {
   VehicleNumber: "",
   discount: "0",
 
-  // 1 = Card
-  // 2 = Cash
-  paymentMethod: 2,
+  // 1 = Cash
+  // 2 = Card
+  paymentMethod: 1,
 };
 
+/* =========================================================
+   Main Component
+   ========================================================= */
+
 export default function Payments() {
+  /* =======================================================
+     Page View
+     ======================================================= */
+
+  const [pageView, setPageView] = useState<"list" | "add">("list");
+
+  /* =======================================================
+     Payment List
+     ======================================================= */
+
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+
+  const [paymentSearch, setPaymentSearch] = useState("");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const [isPaymentsLoading, setIsPaymentsLoading] = useState(true);
+
+  const [selectedPayment, setSelectedPayment] =
+    useState<PaymentRecord | null>(null);
+
+  /* =======================================================
+     Packages / Services
+     ======================================================= */
+
   const [packages, setPackages] = useState<CarPackage[]>([]);
   const [services, setServices] = useState<CarService[]>([]);
 
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
 
+  /* =======================================================
+     Payment Form
+     ======================================================= */
+
   const [form, setForm] = useState<PaymentForm>(initialForm);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPackagesLoading, setIsPackagesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [selectorSearch, setSelectorSearch] = useState("");
 
-  /* Package information modal */
   const [selectedInfoPackage, setSelectedInfoPackage] =
     useState<CarPackage | null>(null);
 
@@ -136,12 +218,44 @@ export default function Payments() {
   const selectorRef = useRef<HTMLDivElement | null>(null);
 
   /* =========================================================
-     Load packages + services
+     Load Payments
+     ========================================================= */
+
+  const getAllPayments = async () => {
+    try {
+      setIsPaymentsLoading(true);
+
+      const res = await getPayments();
+
+      setPayments(Array.isArray(res) ? res : []);
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+
+      setPayments([]);
+
+      setPageAlert({
+        visible: true,
+        variant: "error",
+        title: "Unable to load payments",
+        description:
+          "An error occurred while loading car wash payment records.",
+      });
+    } finally {
+      setIsPaymentsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void getAllPayments();
+  }, []);
+
+  /* =========================================================
+     Load Packages + Services
      ========================================================= */
 
   const getAllPackages = async () => {
     try {
-      setIsLoading(true);
+      setIsPackagesLoading(true);
 
       const res: PackagesResponse = await getAllCarPackages();
 
@@ -166,29 +280,51 @@ export default function Payments() {
           "An error occurred while loading car wash packages and services.",
       });
     } finally {
-      setIsLoading(false);
+      setIsPackagesLoading(false);
     }
   };
 
-  useEffect(() => {
-    void getAllPackages();
-  }, []);
+  /* =========================================================
+     Open Add Payment View
+     ========================================================= */
+
+  const handleOpenAddPayment = async () => {
+    setPageView("add");
+
+    if (packages.length === 0 && services.length === 0) {
+      await getAllPackages();
+    }
+  };
+
+  /* =========================================================
+     Back To Payments
+     ========================================================= */
+
+  const handleBackToPayments = () => {
+    setPageView("list");
+    setIsSelectorOpen(false);
+    setSelectedInfoPackage(null);
+  };
+
+  /* =========================================================
+     Auto Close Alert
+     ========================================================= */
 
   useEffect(() => {
     if (!pageAlert.visible) return;
 
     const timer = setTimeout(() => {
-      setPageAlert((prev) => ({
-        ...prev,
+      setPageAlert((previous) => ({
+        ...previous,
         visible: false,
       }));
-    }, 2000);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [pageAlert.visible]);
 
   /* =========================================================
-     Close selector dropdown
+     Close Selector Outside
      ========================================================= */
 
   useEffect(() => {
@@ -209,7 +345,7 @@ export default function Payments() {
   }, []);
 
   /* =========================================================
-     Currency
+     Formatting
      ========================================================= */
 
   const formatPrice = (price: number) => {
@@ -217,8 +353,143 @@ export default function Payments() {
       style: "currency",
       currency: "LKR",
       minimumFractionDigits: 0,
-    }).format(price);
+    }).format(Number(price || 0));
   };
+
+  const formatDate = (date: string) => {
+    if (!date) return "-";
+
+    return new Intl.DateTimeFormat("en-LK", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(date));
+  };
+
+  const getPaymentMethodName = (paymentMethod: number) => {
+    switch (paymentMethod) {
+      case 1:
+        return "Cash";
+
+      case 2:
+        return "Card";
+
+      default:
+        return "Unknown";
+    }
+  };
+
+  const getOrderStatusName = (status: number) => {
+    switch (status) {
+      case 1:
+        return "Completed";
+
+      case 2:
+        return "In Progress";
+
+      case 3:
+        return "Cancelled";
+
+      default:
+        return `Status ${status}`;
+    }
+  };
+
+  /* =========================================================
+     Payment List Search
+     ========================================================= */
+
+  const filteredPayments = useMemo(() => {
+    const search = paymentSearch.trim().toLowerCase();
+
+    if (!search) {
+      return payments;
+    }
+
+    return payments.filter((payment) => {
+      const packageNames = payment.packages
+        ?.map((item) => item.packageName)
+        .join(" ")
+        .toLowerCase();
+
+      const serviceNames = payment.services
+        ?.map((item) => item.serviceName)
+        .join(" ")
+        .toLowerCase();
+
+      return (
+        payment.orderNumber?.toLowerCase().includes(search) ||
+        payment.customerName?.toLowerCase().includes(search) ||
+        payment.customerPhone?.toLowerCase().includes(search) ||
+        payment.vehicleNumber?.toLowerCase().includes(search) ||
+        packageNames?.includes(search) ||
+        serviceNames?.includes(search) ||
+        String(payment.discountedTotalAmount).includes(search)
+      );
+    });
+  }, [paymentSearch, payments]);
+
+  /* =========================================================
+     Pagination
+     ========================================================= */
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredPayments.length / itemsPerPage),
+  );
+
+  const paginatedPayments = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+
+    return filteredPayments.slice(start, start + itemsPerPage);
+  }, [currentPage, filteredPayments, itemsPerPage]);
+
+  const showingFrom =
+    filteredPayments.length === 0
+      ? 0
+      : (currentPage - 1) * itemsPerPage + 1;
+
+  const showingTo = Math.min(
+    currentPage * itemsPerPage,
+    filteredPayments.length,
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  /* =========================================================
+     Payment Summary
+     ========================================================= */
+
+  const totalRevenue = useMemo(() => {
+    return payments.reduce(
+      (total, payment) => total + Number(payment.discountedTotalAmount || 0),
+      0,
+    );
+  }, [payments]);
+
+  const cashRevenue = useMemo(() => {
+    return payments
+      .filter((payment) => payment.paymentMethod === 1)
+      .reduce(
+        (total, payment) => total + Number(payment.discountedTotalAmount || 0),
+        0,
+      );
+  }, [payments]);
+
+  const cardRevenue = useMemo(() => {
+    return payments
+      .filter((payment) => payment.paymentMethod === 2)
+      .reduce(
+        (total, payment) => total + Number(payment.discountedTotalAmount || 0),
+        0,
+      );
+  }, [payments]);
 
   /* =========================================================
      Selected Packages
@@ -259,7 +530,7 @@ export default function Payments() {
   }, [selectedPackages, selectedServices]);
 
   /* =========================================================
-     Totals
+     Form Totals
      ========================================================= */
 
   const packageTotal = useMemo(() => {
@@ -283,7 +554,7 @@ export default function Payments() {
   const discountedTotal = Math.max(subTotal - discount, 0);
 
   /* =========================================================
-     Filter Packages
+     Package Search
      ========================================================= */
 
   const filteredPackages = useMemo(() => {
@@ -310,7 +581,7 @@ export default function Payments() {
   }, [packages, selectorSearch]);
 
   /* =========================================================
-     Filter Services
+     Service Search
      ========================================================= */
 
   const filteredServices = useMemo(() => {
@@ -329,7 +600,7 @@ export default function Payments() {
   }, [services, selectorSearch]);
 
   /* =========================================================
-     Toggle Package
+     Selection
      ========================================================= */
 
   const togglePackage = (id: string) => {
@@ -342,10 +613,6 @@ export default function Payments() {
     });
   };
 
-  /* =========================================================
-     Toggle Service
-     ========================================================= */
-
   const toggleService = (id: string) => {
     setSelectedServiceIds((previous) => {
       if (previous.includes(id)) {
@@ -355,10 +622,6 @@ export default function Payments() {
       return [...previous, id];
     });
   };
-
-  /* =========================================================
-     Remove Selected Item
-     ========================================================= */
 
   const removeSelectedItem = (item: SelectedItem) => {
     if (item.type === "package") {
@@ -374,10 +637,6 @@ export default function Payments() {
     );
   };
 
-  /* =========================================================
-     Clear Selection
-     ========================================================= */
-
   const clearSelection = () => {
     setSelectedPackageIds([]);
     setSelectedServiceIds([]);
@@ -387,7 +646,10 @@ export default function Payments() {
      Form Change
      ========================================================= */
 
-  const handleChange = (field: keyof PaymentForm, value: string | 1 | 2) => {
+  const handleChange = (
+    field: keyof PaymentForm,
+    value: string | 1 | 2,
+  ) => {
     setForm((previous) => ({
       ...previous,
       [field]: value,
@@ -406,6 +668,7 @@ export default function Payments() {
 
     setSelectorSearch("");
     setIsSelectorOpen(false);
+    setSelectedInfoPackage(null);
   };
 
   /* =========================================================
@@ -418,8 +681,6 @@ export default function Payments() {
 
       const response = await pay(paymentData);
 
-      console.log("Payment response:", response);
-
       setPageAlert({
         visible: true,
         variant: "success",
@@ -428,6 +689,10 @@ export default function Payments() {
       });
 
       resetPaymentForm();
+
+      await getAllPayments();
+
+      setPageView("list");
 
       return response;
     } catch (error) {
@@ -447,13 +712,16 @@ export default function Payments() {
   };
 
   /* =========================================================
-     Submit
+     Submit Payment
      ========================================================= */
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (selectedPackageIds.length === 0 && selectedServiceIds.length === 0) {
+    if (
+      selectedPackageIds.length === 0 &&
+      selectedServiceIds.length === 0
+    ) {
       setPageAlert({
         visible: true,
         variant: "warning",
@@ -488,13 +756,8 @@ export default function Payments() {
 
     const payload = new FormData();
 
-    /* Customer */
-
     payload.append("CustomerName", form.customerName.trim());
-
     payload.append("CustomerPhone", form.customerPhone.trim());
-
-    /* Vehicle */
 
     if (form.vehicleType) {
       payload.append("VehicleType", form.vehicleType);
@@ -502,50 +765,36 @@ export default function Payments() {
 
     payload.append("VehicleNumber", form.VehicleNumber.trim());
 
-    /* Amounts */
-
     payload.append("SubTotalAmount", String(subTotal));
-
     payload.append("Discount", String(discount));
-
     payload.append("DiscountedTotalAmount", String(discountedTotal));
-
-    /* Payment */
 
     payload.append("IsPaid", "true");
 
-    // 1 = Card
-    // 2 = Cash
+    // Card = 2
+    // Cash = 1
     payload.append("PaymentMethod", String(form.paymentMethod));
 
     payload.append("CarWashOrderStatus", "1");
-
-    /* Package IDs */
 
     selectedPackageIds.forEach((id) => {
       payload.append("PackageIds", id);
     });
 
-    /* Service IDs */
-
     selectedServiceIds.forEach((id) => {
       payload.append("ServicesIds", id);
     });
 
-    console.log("Payment request:");
-
-    for (const [key, value] of payload.entries()) {
-      console.log(`${key}:`, value);
-    }
-
     await handlePay(payload);
   };
 
+  /* =========================================================
+     Main UI
+     ========================================================= */
+
   return (
     <main className="min-h-screen bg-slate-50/60">
-      {/* =====================================================
-          Alert
-          ===================================================== */}
+      {/* Alert */}
 
       {pageAlert.visible &&
         createPortal(
@@ -563,27 +812,27 @@ export default function Payments() {
           document.body,
         )}
 
-      {/* =====================================================
-          Loading
-          ===================================================== */}
+      {/* Loading */}
 
-      {(isLoading || isSubmitting) &&
+      {(isPaymentsLoading || isPackagesLoading || isSubmitting) &&
         createPortal(
           <div className="fixed inset-0 z-[99998] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3">
               <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/30 border-t-white" />
 
               <p className="text-sm font-medium text-white">
-                {isSubmitting ? "Processing payment..." : "Loading packages..."}
+                {isSubmitting
+                  ? "Processing payment..."
+                  : pageView === "add"
+                    ? "Loading packages..."
+                    : "Loading payments..."}
               </p>
             </div>
           </div>,
           document.body,
         )}
 
-      {/* =====================================================
-          Package Info Modal
-          ===================================================== */}
+      {/* Package Info */}
 
       {selectedInfoPackage && (
         <PackageInfoModal
@@ -593,542 +842,1161 @@ export default function Payments() {
         />
       )}
 
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* =====================================================
-            Header
-            ===================================================== */}
+      {/* Payment Details */}
 
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {selectedPayment && (
+        <PaymentDetailsModal
+          payment={selectedPayment}
+          formatPrice={formatPrice}
+          formatDate={formatDate}
+          getPaymentMethodName={getPaymentMethodName}
+          getOrderStatusName={getOrderStatusName}
+          onClose={() => setSelectedPayment(null)}
+        />
+      )}
+
+      {/* =====================================================
+          LIST VIEW
+          ===================================================== */}
+
+      {pageView === "list" && (
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          {/* Header */}
+
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-900 text-white shadow-sm shadow-blue-900/20">
+                <ReceiptText size={21} />
+              </div>
+
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                  Car Wash Payments
+                </h1>
+
+                <p className="text-sm text-slate-500">
+                  View and manage car wash orders and payments.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={getAllPayments}
+                disabled={isPaymentsLoading}
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCcw
+                  size={16}
+                  className={isPaymentsLoading ? "animate-spin" : ""}
+                />
+
+                Refresh
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenAddPayment}
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                <Plus size={17} />
+
+                Add Payment
+              </button>
+            </div>
+          </div>
+
+          {/* Summary */}
+
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard
+              title="Total Payments"
+              value={String(payments.length)}
+              icon={<ReceiptText size={20} />}
+              iconClassName="bg-blue-50 text-blue-900"
+            />
+
+            <SummaryCard
+              title="Total Revenue"
+              value={formatPrice(totalRevenue)}
+              icon={<Banknote size={20} />}
+              iconClassName="bg-emerald-50 text-emerald-600"
+            />
+
+            <SummaryCard
+              title="Cash Revenue"
+              value={formatPrice(cashRevenue)}
+              icon={<Banknote size={20} />}
+              iconClassName="bg-amber-50 text-amber-600"
+            />
+
+            <SummaryCard
+              title="Card Revenue"
+              value={formatPrice(cardRevenue)}
+              icon={<CreditCard size={20} />}
+              iconClassName="bg-violet-50 text-violet-600"
+            />
+          </div>
+
+          {/* Table Card */}
+
+          <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {/* Search */}
+
+            <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-md">
+                <Search
+                  size={18}
+                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+
+                <input
+                  type="text"
+                  value={paymentSearch}
+                  onChange={(event) => {
+                    setPaymentSearch(event.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search order, customer, phone or vehicle..."
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                />
+              </div>
+
+              <p className="text-sm text-slate-500">
+                <span className="font-semibold text-slate-700">
+                  {filteredPayments.length}
+                </span>{" "}
+                payments
+              </p>
+            </div>
+
+            {/* Desktop Table */}
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1100px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/80">
+                    <TableHeading>Order</TableHeading>
+
+                    <TableHeading>Date</TableHeading>
+
+                    <TableHeading>Customer</TableHeading>
+
+                    <TableHeading>Vehicle</TableHeading>
+
+                    <TableHeading>Payment</TableHeading>
+
+                    <TableHeading>Amount</TableHeading>
+
+                    <th className="w-20 px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedPayments.length > 0 ? (
+                    paginatedPayments.map((payment) => {
+                      const totalItems =
+                        (payment.packages?.length ?? 0) +
+                        (payment.services?.length ?? 0);
+
+                      return (
+                        <tr
+                          key={payment.carWashOrderId}
+                          className="transition hover:bg-slate-50/80"
+                        >
+                          {/* Order */}
+
+                          <td className="px-5 py-4">
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                {payment.orderNumber || "-"}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Date */}
+
+                          <td className="px-5 py-4 text-sm text-slate-600">
+                            {formatDate(payment.orderDate)}
+                          </td>
+
+                          {/* Customer */}
+
+                          <td className="px-5 py-4">
+                            <p className="text-sm font-semibold text-slate-800">
+                              {payment.customerName || "Walk-in Customer"}
+                            </p>
+
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {payment.customerPhone || "-"}
+                            </p>
+                          </td>
+
+                          {/* Vehicle */}
+
+                          <td className="px-5 py-4">
+                            <p className="text-sm font-semibold text-slate-700">
+                              {payment.vehicleNumber || "-"}
+                            </p>
+
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              Type: {payment.vehicleType || "-"}
+                            </p>
+                          </td>
+
+                          {/* Method */}
+
+                          <td className="px-5 py-4">
+                            <PaymentMethodBadge
+                              paymentMethod={payment.paymentMethod}
+                            />
+                          </td>
+
+                          {/* Amount */}
+
+                          <td className="px-5 py-4">
+                            <p className="font-bold text-emerald-700">
+                              {formatPrice(payment.discountedTotalAmount)}
+                            </p>
+
+                            {payment.discount > 0 && (
+                              <p className="mt-0.5 text-xs text-slate-400">
+                                Discount {formatPrice(payment.discount)}
+                              </p>
+                            )}
+                          </td>
+
+                          {/* Action */}
+
+                          <td className="px-5 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPayment(payment)}
+                              title="View payment details"
+                              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700"
+                            >
+                              <Eye size={17} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={9}>
+                        <PaymentsEmptyState />
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile */}
+
+            <div className="divide-y divide-slate-100 md:hidden">
+              {paginatedPayments.length > 0 ? (
+                paginatedPayments.map((payment) => {
+                  const totalItems =
+                    (payment.packages?.length ?? 0) +
+                    (payment.services?.length ?? 0);
+
+                  return (
+                    <article
+                      key={payment.carWashOrderId}
+                      className="p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900">
+                            {payment.orderNumber || "-"}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatDate(payment.orderDate)}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPayment(payment)}
+                          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-900"
+                        >
+                          <Eye size={17} />
+                        </button>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <MobileInfo
+                          label="Customer"
+                          value={payment.customerName || "Walk-in"}
+                        />
+
+                        <MobileInfo
+                          label="Vehicle"
+                          value={payment.vehicleNumber || "-"}
+                        />
+
+                        <MobileInfo
+                          label="Items"
+                          value={`${totalItems}`}
+                        />
+
+                        <MobileInfo
+                          label="Payment"
+                          value={getPaymentMethodName(payment.paymentMethod)}
+                        />
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                        <OrderStatusBadge
+                          status={payment.carWashOrderStatus}
+                          isPaid={payment.isPaid}
+                        />
+
+                        <p className="text-lg font-bold text-emerald-700">
+                          {formatPrice(payment.discountedTotalAmount)}
+                        </p>
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
+                <PaymentsEmptyState />
+              )}
+            </div>
+
+            {/* Pagination */}
+
+            {!isPaymentsLoading && filteredPayments.length > 0 && (
+              <div className="flex flex-col gap-4 border-t border-slate-200 bg-slate-50/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                  <p className="text-sm text-slate-500">
+                    Showing{" "}
+                    <span className="font-semibold text-slate-700">
+                      {showingFrom}
+                    </span>{" "}
+                    to{" "}
+                    <span className="font-semibold text-slate-700">
+                      {showingTo}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-semibold text-slate-700">
+                      {filteredPayments.length}
+                    </span>{" "}
+                    payments
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="payment-rows"
+                      className="text-xs font-medium text-slate-500"
+                    >
+                      Rows:
+                    </label>
+
+                    <select
+                      id="payment-rows"
+                      value={itemsPerPage}
+                      onChange={(event) => {
+                        setItemsPerPage(Number(event.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((previous) => Math.max(previous - 1, 1))
+                    }
+                    disabled={currentPage === 1}
+                    className="inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+
+                  <span className="text-sm font-semibold text-slate-600">
+                    {currentPage} / {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((previous) =>
+                        Math.min(previous + 1, totalPages),
+                      )
+                    }
+                    disabled={currentPage === totalPages}
+                    className="inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* =====================================================
+          ADD PAYMENT VIEW
+          ===================================================== */}
+
+      {pageView === "add" && (
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          {/* Header */}
+
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-900 text-white shadow-sm shadow-blue-900/20">
+                <Banknote size={21} />
+              </div>
+
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                  Add Car Wash Payment
+                </h1>
+
+                <p className="text-sm text-slate-500">
+                  Create a customer order and process payment.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleBackToPayments}
+              disabled={isSubmitting}
+              className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+            >
+              <ArrowLeft size={17} />
+
+              Back to Payments
+            </button>
+          </div>
+
+          {/* Summary */}
+
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <SummaryCard
+              title="Selected Items"
+              value={String(selectedItems.length)}
+              icon={<ShoppingCart size={20} />}
+              iconClassName="bg-blue-50 text-blue-900"
+            />
+
+            <SummaryCard
+              title="Subtotal"
+              value={formatPrice(subTotal)}
+              icon={<Banknote size={20} />}
+              iconClassName="bg-emerald-50 text-emerald-600"
+            />
+
+            <SummaryCard
+              title="Final Amount"
+              value={formatPrice(discountedTotal)}
+              icon={<Sparkles size={20} />}
+              iconClassName="bg-violet-50 text-violet-600"
+            />
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+              {/* LEFT */}
+
+              <div className="space-y-6">
+                {/* Packages + Services */}
+
+                <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <SectionHeader
+                    icon={<Package size={19} />}
+                    title="Packages & Services"
+                    description="Select one or multiple packages and individual services."
+                  />
+
+                  <div className="p-5">
+                    <div className="relative" ref={selectorRef}>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                        Select Items
+                        <span className="ml-1 text-red-500">*</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setIsSelectorOpen((previous) => !previous)
+                        }
+                        className={`flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border bg-white px-3.5 py-2.5 text-left transition ${
+                          isSelectorOpen
+                            ? "border-blue-500 ring-4 ring-blue-100"
+                            : "border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <span
+                          className={
+                            selectedItems.length > 0
+                              ? "text-sm font-medium text-slate-800"
+                              : "text-sm text-slate-400"
+                          }
+                        >
+                          {selectedItems.length > 0
+                            ? `${selectedItems.length} item${
+                                selectedItems.length > 1 ? "s" : ""
+                              } selected`
+                            : "Select packages or services"}
+                        </span>
+
+                        <ChevronDown
+                          size={18}
+                          className={`shrink-0 text-slate-400 transition ${
+                            isSelectorOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+
+                      {/* Selector */}
+
+                      {isSelectorOpen && (
+                        <div className="absolute left-0 right-0 top-[76px] z-[100] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                          <div className="border-b border-slate-200 p-3">
+                            <div className="relative">
+                              <Search
+                                size={17}
+                                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                              />
+
+                              <input
+                                type="text"
+                                value={selectorSearch}
+                                onChange={(event) =>
+                                  setSelectorSearch(event.target.value)
+                                }
+                                placeholder="Search packages or services..."
+                                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="max-h-[430px] overflow-y-auto">
+                            {/* Packages */}
+
+                            <div className="border-b border-slate-100">
+                              <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-50 px-4 py-2.5">
+                                <div className="flex items-center gap-2">
+                                  <Package
+                                    size={15}
+                                    className="text-blue-900"
+                                  />
+
+                                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    Packages
+                                  </span>
+                                </div>
+
+                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-900">
+                                  {filteredPackages.length}
+                                </span>
+                              </div>
+
+                              {filteredPackages.length > 0 ? (
+                                filteredPackages.map((item) => {
+                                  const selected =
+                                    selectedPackageIds.includes(item.id);
+
+                                  return (
+                                    <PackageSelectorItem
+                                      key={item.id}
+                                      item={item}
+                                      selected={selected}
+                                      formatPrice={formatPrice}
+                                      onSelect={() => togglePackage(item.id)}
+                                      onInfo={() =>
+                                        setSelectedInfoPackage(item)
+                                      }
+                                    />
+                                  );
+                                })
+                              ) : (
+                                <DropdownEmpty text="No packages found." />
+                              )}
+                            </div>
+
+                            {/* Services */}
+
+                            <div>
+                              <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-50 px-4 py-2.5">
+                                <div className="flex items-center gap-2">
+                                  <CarFront
+                                    size={15}
+                                    className="text-blue-900"
+                                  />
+
+                                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    Individual Services
+                                  </span>
+                                </div>
+
+                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                  {filteredServices.length}
+                                </span>
+                              </div>
+
+                              {filteredServices.length > 0 ? (
+                                filteredServices.map((item) => {
+                                  const selected =
+                                    selectedServiceIds.includes(item.id);
+
+                                  return (
+                                    <SelectorItem
+                                      key={item.id}
+                                      title={item.title}
+                                      description={item.description}
+                                      price={formatPrice(item.price)}
+                                      selected={selected}
+                                      onClick={() => toggleService(item.id)}
+                                    />
+                                  );
+                                })
+                              ) : (
+                                <DropdownEmpty text="No services found." />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Selected Items */}
+
+                    {selectedItems.length > 0 ? (
+                      <div className="mt-5">
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="text-sm font-semibold text-slate-700">
+                            Selected Items
+                          </p>
+
+                          <button
+                            type="button"
+                            onClick={clearSelection}
+                            className="cursor-pointer text-xs font-semibold text-red-600 hover:text-red-700"
+                          >
+                            Clear all
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          {selectedItems.map((item) => {
+                            const selectedPackage =
+                              item.type === "package"
+                                ? packages.find(
+                                    (currentPackage) =>
+                                      currentPackage.id === item.id,
+                                  )
+                                : undefined;
+
+                            return (
+                              <div
+                                key={`${item.type}-${item.id}`}
+                                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3"
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <div
+                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                      item.type === "package"
+                                        ? "bg-blue-100 text-blue-900"
+                                        : "bg-slate-200 text-slate-600"
+                                    }`}
+                                  >
+                                    {item.type === "package" ? (
+                                      <Package size={17} />
+                                    ) : (
+                                      <CarFront size={17} />
+                                    )}
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <p className="truncate text-sm font-semibold text-slate-800">
+                                        {item.title}
+                                      </p>
+
+                                      {selectedPackage && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setSelectedInfoPackage(
+                                              selectedPackage,
+                                            )
+                                          }
+                                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-blue-700 hover:bg-blue-100"
+                                        >
+                                          <Info size={14} />
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <p className="mt-0.5 text-xs capitalize text-slate-500">
+                                      {item.type === "package"
+                                        ? `${selectedPackage?.services.length ?? 0} included services`
+                                        : "Individual service"}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex shrink-0 items-center gap-3">
+                                  <span className="text-sm font-bold text-emerald-600">
+                                    {formatPrice(item.price)}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSelectedItem(item)}
+                                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-5 flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
+                        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-slate-200 text-slate-500">
+                          <ShoppingCart size={20} />
+                        </div>
+
+                        <p className="text-sm font-semibold text-slate-700">
+                          No items selected
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Select packages or services from the dropdown.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Customer */}
+
+                <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <SectionHeader
+                    icon={<User size={19} />}
+                    title="Customer Details"
+                    description="Optional customer and vehicle information."
+                  />
+
+                  <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+                    <InputField
+                      label="Customer Name"
+                      value={form.customerName}
+                      placeholder="Enter customer name"
+                      onChange={(value) =>
+                        handleChange("customerName", value)
+                      }
+                    />
+
+                    <InputField
+                      label="Customer Phone"
+                      value={form.customerPhone}
+                      placeholder="Enter phone number"
+                      onChange={(value) =>
+                        handleChange("customerPhone", value)
+                      }
+                    />
+
+                    <InputField
+                      label="Vehicle Type"
+                      value={form.vehicleType}
+                      type="number"
+                      placeholder="Enter vehicle type"
+                      onChange={(value) =>
+                        handleChange("vehicleType", value)
+                      }
+                    />
+
+                    <InputField
+                      label="Vehicle No"
+                      value={form.VehicleNumber}
+                      placeholder="Example: CAB-1234"
+                      onChange={(value) =>
+                        handleChange("VehicleNumber", value)
+                      }
+                    />
+                  </div>
+                </section>
+              </div>
+
+              {/* RIGHT */}
+
+              <div>
+                <section className="rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-6">
+                  <SectionHeader
+                    icon={<CreditCard size={19} />}
+                    title="Payment"
+                    description="Review order totals and payment method."
+                  />
+
+                  <div className="p-5">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Payment Method
+                      <span className="ml-1 text-red-500">*</span>
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <PaymentMethodCard
+                        title="Cash"
+                        description="Cash payment"
+                        icon={<Banknote size={20} />}
+                        selected={form.paymentMethod === 1}
+                        onClick={() => handleChange("paymentMethod", 1)}
+                      />
+
+                      <PaymentMethodCard
+                        title="Card"
+                        description="Card payment"
+                        icon={<CreditCard size={20} />}
+                        selected={form.paymentMethod === 2}
+                        onClick={() => handleChange("paymentMethod", 2)}
+                      />
+                    </div>
+
+                    <div className="my-5 border-t border-slate-200" />
+
+                    <div className="space-y-3">
+                      <PriceRow
+                        title="Packages"
+                        value={formatPrice(packageTotal)}
+                      />
+
+                      <PriceRow
+                        title="Individual Services"
+                        value={formatPrice(serviceTotal)}
+                      />
+
+                      <PriceRow
+                        title="Subtotal"
+                        value={formatPrice(subTotal)}
+                        strong
+                      />
+                    </div>
+
+                    {/* Discount */}
+
+                    <div className="mt-5">
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                        Discount
+                      </label>
+
+                      <div className="relative">
+                        <BadgePercent
+                          size={17}
+                          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+
+                        <input
+                          type="number"
+                          value={form.discount}
+                          min={0}
+                          max={subTotal}
+                          onChange={(event) =>
+                            handleChange("discount", event.target.value)
+                          }
+                          placeholder="0"
+                          className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-14 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        />
+
+                        <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                          LKR
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Total */}
+
+                    <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-emerald-800">
+                          Total Payable
+                        </span>
+
+                        <Sparkles
+                          size={18}
+                          className="text-emerald-600"
+                        />
+                      </div>
+
+                      <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-700">
+                        {formatPrice(discountedTotal)}
+                      </p>
+
+                      {discount > 0 && (
+                        <p className="mt-1 text-xs font-medium text-emerald-600">
+                          Additional discount: {formatPrice(discount)}
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={
+                        isSubmitting ||
+                        isPackagesLoading ||
+                        selectedItems.length === 0
+                      }
+                      className="mt-5 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2
+                            size={18}
+                            className="animate-spin"
+                          />
+
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={18} />
+
+                          Add Payment
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+    </main>
+  );
+}
+
+/* =========================================================
+   Payment Details Modal
+   ========================================================= */
+
+function PaymentDetailsModal({
+  payment,
+  formatPrice,
+  formatDate,
+  getPaymentMethodName,
+  getOrderStatusName,
+  onClose,
+}: {
+  payment: PaymentRecord;
+  formatPrice: (price: number) => string;
+  formatDate: (date: string) => string;
+  getPaymentMethodName: (method: number) => string;
+  getOrderStatusName: (status: number) => string;
+  onClose: () => void;
+}) {
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+        {/* Header */}
+
+        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-900 text-white shadow-sm shadow-blue-900/20">
-              <Banknote size={21} />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-900 text-white">
+              <ReceiptText size={21} />
             </div>
 
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Add Car Wash Payment
-              </h1>
+              <h2 className="text-xl font-bold text-slate-900">
+                Payment Details
+              </h2>
 
-              <p className="text-sm text-slate-500">
-                Create a customer order and process payment.
+              <p className="mt-0.5 text-sm text-slate-500">
+                {payment.orderNumber || "Car wash order"}
               </p>
             </div>
           </div>
 
           <button
             type="button"
-            onClick={getAllPackages}
-            disabled={isLoading || isSubmitting}
-            className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={onClose}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
           >
-            <RefreshCcw size={16} className={isLoading ? "animate-spin" : ""} />
-            Refresh
+            <X size={20} />
           </button>
         </div>
 
-        {/* =====================================================
-            Summary
-            ===================================================== */}
+        {/* Body */}
 
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <SummaryCard
-            title="Selected Items"
-            value={String(selectedItems.length)}
-            icon={<ShoppingCart size={20} />}
-            iconClassName="bg-blue-50 text-blue-900"
-          />
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <DetailCard
+              label="Order Number"
+              value={payment.orderNumber || "-"}
+            />
 
-          <SummaryCard
-            title="Subtotal"
-            value={formatPrice(subTotal)}
-            icon={<Banknote size={20} />}
-            iconClassName="bg-emerald-50 text-emerald-600"
-          />
+            <DetailCard
+              label="Order Date"
+              value={formatDate(payment.orderDate)}
+            />
 
-          <SummaryCard
-            title="Final Amount"
-            value={formatPrice(discountedTotal)}
-            icon={<Sparkles size={20} />}
-            iconClassName="bg-violet-50 text-violet-600"
-          />
-        </div>
+            <DetailCard
+              label="Payment Method"
+              value={getPaymentMethodName(payment.paymentMethod)}
+            />
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
-            {/* =================================================
-                LEFT
-                ================================================= */}
+            <DetailCard
+              label="Customer"
+              value={payment.customerName || "Walk-in Customer"}
+            />
 
-            <div className="space-y-6">
-              {/* =================================================
-                  Packages + Services
-                  ================================================= */}
+            <DetailCard
+              label="Phone"
+              value={payment.customerPhone || "-"}
+            />
 
-              <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <SectionHeader
-                  icon={<Package size={19} />}
-                  title="Packages & Services"
-                  description="Select one or multiple packages and individual services."
-                />
+            <DetailCard
+              label="Vehicle"
+              value={payment.vehicleNumber || "-"}
+            />
 
-                <div className="p-5">
-                  <div className="relative" ref={selectorRef}>
-                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                      Select Items
-                      <span className="ml-1 text-red-500">*</span>
-                    </label>
+            <DetailCard
+              label="Vehicle Type"
+              value={String(payment.vehicleType || "-")}
+            />
 
-                    <button
-                      type="button"
-                      onClick={() => setIsSelectorOpen((previous) => !previous)}
-                      className={`flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border bg-white px-3.5 py-2.5 text-left transition ${
-                        isSelectorOpen
-                          ? "border-blue-500 ring-4 ring-blue-100"
-                          : "border-slate-200 hover:border-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={
-                          selectedItems.length > 0
-                            ? "text-sm font-medium text-slate-800"
-                            : "text-sm text-slate-400"
-                        }
-                      >
-                        {selectedItems.length > 0
-                          ? `${selectedItems.length} item${
-                              selectedItems.length > 1 ? "s" : ""
-                            } selected`
-                          : "Select packages or services"}
-                      </span>
+            <DetailCard
+              label="Order Status"
+              value={getOrderStatusName(payment.carWashOrderStatus)}
+            />
 
-                      <ChevronDown
-                        size={18}
-                        className={`shrink-0 text-slate-400 transition ${
-                          isSelectorOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
+            <DetailCard
+              label="Payment Status"
+              value={payment.isPaid ? "Paid" : "Unpaid"}
+            />
+          </div>
 
-                    {/* =================================================
-                        Selector Dropdown
-                        ================================================= */}
+          {/* Packages */}
 
-                    {isSelectorOpen && (
-                      <div className="absolute left-0 right-0 top-[76px] z-[100] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                        {/* Search */}
+          <div className="mt-6">
+            <h3 className="font-bold text-slate-900">
+              Packages
+            </h3>
 
-                        <div className="border-b border-slate-200 p-3">
-                          <div className="relative">
-                            <Search
-                              size={17}
-                              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                            />
+            <p className="mt-0.5 text-xs text-slate-500">
+              Packages added to this payment.
+            </p>
 
-                            <input
-                              type="text"
-                              value={selectorSearch}
-                              onChange={(event) =>
-                                setSelectorSearch(event.target.value)
-                              }
-                              placeholder="Search packages or services..."
-                              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="max-h-[430px] overflow-y-auto">
-                          {/* =================================================
-                              Packages
-                              ================================================= */}
-
-                          <div className="border-b border-slate-100">
-                            <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-50 px-4 py-2.5">
-                              <div className="flex items-center gap-2">
-                                <Package size={15} className="text-blue-900" />
-
-                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                  Packages
-                                </span>
-                              </div>
-
-                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-900">
-                                {filteredPackages.length}
-                              </span>
-                            </div>
-
-                            {filteredPackages.length > 0 ? (
-                              filteredPackages.map((item) => {
-                                const selected = selectedPackageIds.includes(
-                                  item.id,
-                                );
-
-                                return (
-                                  <PackageSelectorItem
-                                    key={item.id}
-                                    item={item}
-                                    selected={selected}
-                                    formatPrice={formatPrice}
-                                    onSelect={() => togglePackage(item.id)}
-                                    onInfo={() => setSelectedInfoPackage(item)}
-                                  />
-                                );
-                              })
-                            ) : (
-                              <DropdownEmpty text="No packages found." />
-                            )}
-                          </div>
-
-                          {/* =================================================
-                              Services
-                              ================================================= */}
-
-                          <div>
-                            <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-50 px-4 py-2.5">
-                              <div className="flex items-center gap-2">
-                                <CarFront size={15} className="text-blue-900" />
-
-                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                  Individual Services
-                                </span>
-                              </div>
-
-                              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                                {filteredServices.length}
-                              </span>
-                            </div>
-
-                            {filteredServices.length > 0 ? (
-                              filteredServices.map((item) => {
-                                const selected = selectedServiceIds.includes(
-                                  item.id,
-                                );
-
-                                return (
-                                  <SelectorItem
-                                    key={item.id}
-                                    title={item.title}
-                                    description={item.description}
-                                    price={formatPrice(item.price)}
-                                    selected={selected}
-                                    onClick={() => toggleService(item.id)}
-                                  />
-                                );
-                              })
-                            ) : (
-                              <DropdownEmpty text="No services found." />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* =================================================
-                      Selected Items
-                      ================================================= */}
-
-                  {selectedItems.length > 0 ? (
-                    <div className="mt-5">
-                      <div className="mb-3 flex items-center justify-between">
-                        <p className="text-sm font-semibold text-slate-700">
-                          Selected Items
-                        </p>
-
-                        <button
-                          type="button"
-                          onClick={clearSelection}
-                          className="cursor-pointer text-xs font-semibold text-red-600 transition hover:text-red-700"
-                        >
-                          Clear all
-                        </button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {selectedItems.map((item) => {
-                          const selectedPackage =
-                            item.type === "package"
-                              ? packages.find(
-                                  (currentPackage) =>
-                                    currentPackage.id === item.id,
-                                )
-                              : undefined;
-
-                          return (
-                            <div
-                              key={`${item.type}-${item.id}`}
-                              className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3"
-                            >
-                              <div className="flex min-w-0 items-center gap-3">
-                                <div
-                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                                    item.type === "package"
-                                      ? "bg-blue-100 text-blue-900"
-                                      : "bg-slate-200 text-slate-600"
-                                  }`}
-                                >
-                                  {item.type === "package" ? (
-                                    <Package size={17} />
-                                  ) : (
-                                    <CarFront size={17} />
-                                  )}
-                                </div>
-
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <p className="truncate text-sm font-semibold text-slate-800">
-                                      {item.title}
-                                    </p>
-
-                                    {selectedPackage && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setSelectedInfoPackage(
-                                            selectedPackage,
-                                          )
-                                        }
-                                        title="View package details"
-                                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-blue-700 transition hover:bg-blue-100"
-                                      >
-                                        <Info size={14} />
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  <p className="mt-0.5 text-xs capitalize text-slate-500">
-                                    {item.type === "package"
-                                      ? `${selectedPackage?.services.length ?? 0} included services`
-                                      : "Individual service"}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="flex shrink-0 items-center gap-3">
-                                <span className="text-sm font-bold text-emerald-600">
-                                  {formatPrice(item.price)}
-                                </span>
-
-                                <button
-                                  type="button"
-                                  onClick={() => removeSelectedItem(item)}
-                                  aria-label={`Remove ${item.title}`}
-                                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                                >
-                                  <X size={16} />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-5 flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-                      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-slate-200 text-slate-500">
-                        <ShoppingCart size={20} />
-                      </div>
-
-                      <p className="text-sm font-semibold text-slate-700">
-                        No items selected
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-500">
-                        Select packages or services from the dropdown.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* =================================================
-                  Customer
-                  ================================================= */}
-
-              <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <SectionHeader
-                  icon={<User size={19} />}
-                  title="Customer Details"
-                  description="Optional customer and vehicle information."
-                />
-
-                <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
-                  <InputField
-                    label="Customer Name"
-                    value={form.customerName}
-                    placeholder="Enter customer name"
-                    onChange={(value) => handleChange("customerName", value)}
+            <div className="mt-3 space-y-2">
+              {payment.packages?.length > 0 ? (
+                payment.packages.map((item) => (
+                  <OrderItem
+                    key={item.carWashPackageId}
+                    icon={<Package size={17} />}
+                    name={item.packageName}
+                    price={formatPrice(item.packagePrice)}
                   />
-
-                  <InputField
-                    label="Customer Phone"
-                    value={form.customerPhone}
-                    placeholder="Enter phone number"
-                    onChange={(value) => handleChange("customerPhone", value)}
-                  />
-
-                  <InputField
-                    label="Vehicle Type"
-                    value={form.vehicleType}
-                    type="number"
-                    placeholder="Enter vehicle type"
-                    onChange={(value) => handleChange("vehicleType", value)}
-                  />
-
-                  <InputField
-                    label="Vehicle No"
-                    value={form.VehicleNumber}
-                    placeholder="Example: CAB-1234"
-                    onChange={(value) => handleChange("VehicleNumber", value)}
-                  />
-                </div>
-              </section>
-            </div>
-
-            {/* =================================================
-                RIGHT PAYMENT
-                ================================================= */}
-
-            <div>
-              <section className="rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-6">
-                <SectionHeader
-                  icon={<CreditCard size={19} />}
-                  title="Payment"
-                  description="Review order totals and payment method."
-                />
-
-                <div className="p-5">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Payment Method
-                    <span className="ml-1 text-red-500">*</span>
-                  </label>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <PaymentMethodCard
-                      title="Cash"
-                      description="Cash payment"
-                      icon={<Banknote size={20} />}
-                      selected={form.paymentMethod === 2}
-                      onClick={() => handleChange("paymentMethod", 2)}
-                    />
-
-                    <PaymentMethodCard
-                      title="Card"
-                      description="Card payment"
-                      icon={<CreditCard size={20} />}
-                      selected={form.paymentMethod === 1}
-                      onClick={() => handleChange("paymentMethod", 1)}
-                    />
-                  </div>
-
-                  <div className="my-5 border-t border-slate-200" />
-
-                  <div className="space-y-3">
-                    <PriceRow
-                      title="Packages"
-                      value={formatPrice(packageTotal)}
-                    />
-
-                    <PriceRow
-                      title="Individual Services"
-                      value={formatPrice(serviceTotal)}
-                    />
-
-                    <PriceRow
-                      title="Subtotal"
-                      value={formatPrice(subTotal)}
-                      strong
-                    />
-                  </div>
-
-                  {/* Discount */}
-
-                  <div className="mt-5">
-                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                      Discount
-                    </label>
-
-                    <div className="relative">
-                      <BadgePercent
-                        size={17}
-                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                      />
-
-                      <input
-                        type="number"
-                        value={form.discount}
-                        min={0}
-                        max={subTotal}
-                        onChange={(event) =>
-                          handleChange("discount", event.target.value)
-                        }
-                        placeholder="0"
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-14 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                      />
-
-                      <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
-                        LKR
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Final */}
-
-                  <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-emerald-800">
-                        Total Payable
-                      </span>
-
-                      <Sparkles size={18} className="text-emerald-600" />
-                    </div>
-
-                    <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-700">
-                      {formatPrice(discountedTotal)}
-                    </p>
-
-                    {discount > 0 && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">
-                        Additional discount: {formatPrice(discount)}
-                      </p>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={
-                      isSubmitting || isLoading || selectedItems.length === 0
-                    }
-                    className="mt-5 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 size={18} className="animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Plus size={18} />
-                        Add Payment
-                      </>
-                    )}
-                  </button>
-
-                  <p className="mt-3 text-center text-xs leading-5 text-slate-400">
-                    Review the selected packages, services and total before
-                    submitting the payment.
-                  </p>
-                </div>
-              </section>
+                ))
+              ) : (
+                <SmallEmpty text="No packages added." />
+              )}
             </div>
           </div>
-        </form>
+
+          {/* Services */}
+
+          <div className="mt-6">
+            <h3 className="font-bold text-slate-900">
+              Individual Services
+            </h3>
+
+            <p className="mt-0.5 text-xs text-slate-500">
+              Individual services added to this payment.
+            </p>
+
+            <div className="mt-3 space-y-2">
+              {payment.services?.length > 0 ? (
+                payment.services.map((item) => (
+                  <OrderItem
+                    key={item.carWashServiceId}
+                    icon={<CarFront size={17} />}
+                    name={item.serviceName}
+                    price={formatPrice(item.servicePrice)}
+                  />
+                ))
+              ) : (
+                <SmallEmpty text="No individual services added." />
+              )}
+            </div>
+          </div>
+
+          {/* Pricing */}
+
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="space-y-3">
+              <PriceRow
+                title="Subtotal"
+                value={formatPrice(payment.subTotalAmount)}
+              />
+
+              <PriceRow
+                title="Discount"
+                value={`- ${formatPrice(payment.discount)}`}
+              />
+
+              <div className="border-t border-slate-200 pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900">
+                    Total Paid
+                  </span>
+
+                  <span className="text-xl font-bold text-emerald-700">
+                    {formatPrice(payment.discountedTotalAmount)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+
+        <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Close
+          </button>
+        </div>
       </div>
-    </main>
+    </div>,
+    document.body,
   );
 }
 
 /* =========================================================
-   Package Selector Item
+   Package Selector
    ========================================================= */
 
 function PackageSelectorItem({
@@ -1144,12 +2012,17 @@ function PackageSelectorItem({
   onSelect: () => void;
   onInfo: () => void;
 }) {
-  const savings = Math.max(item.pricesWithoutDiscounts - item.basPrice, 0);
+  const savings = Math.max(
+    item.pricesWithoutDiscounts - item.basPrice,
+    0,
+  );
 
   return (
     <div
-      className={`flex items-center gap-3 border-b border-slate-100 px-4 py-3 transition last:border-b-0 ${
-        selected ? "bg-blue-50/70" : "hover:bg-slate-50"
+      className={`flex items-center gap-3 border-b border-slate-100 px-4 py-3 ${
+        selected
+          ? "bg-blue-50/70"
+          : "hover:bg-slate-50"
       }`}
     >
       <button
@@ -1158,7 +2031,7 @@ function PackageSelectorItem({
         className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
       >
         <div
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
             selected
               ? "border-blue-900 bg-blue-900 text-white"
               : "border-slate-300 bg-white"
@@ -1168,13 +2041,13 @@ function PackageSelectorItem({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex items-center gap-2">
             <p className="truncate text-sm font-semibold text-slate-800">
               {item.title}
             </p>
 
             {savings > 0 && (
-              <span className="hidden shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 sm:inline-flex">
+              <span className="hidden rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 sm:inline-flex">
                 Save {formatPrice(savings)}
               </span>
             )}
@@ -1201,13 +2074,9 @@ function PackageSelectorItem({
 
       <button
         type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onInfo();
-        }}
+        onClick={onInfo}
         title="View included services"
-        aria-label={`View ${item.title} package details`}
-        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
+        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-900 hover:bg-blue-100"
       >
         <Info size={17} />
       </button>
@@ -1216,7 +2085,7 @@ function PackageSelectorItem({
 }
 
 /* =========================================================
-   Package Info Modal
+   Package Information Modal
    ========================================================= */
 
 function PackageInfoModal({
@@ -1228,20 +2097,18 @@ function PackageInfoModal({
   formatPrice: (price: number) => string;
   onClose: () => void;
 }) {
-  const calculatedNormalPrice = packageItem.services.reduce(
-    (total, service) => total + service.price,
-    0,
-  );
-
   const normalPrice =
     packageItem.pricesWithoutDiscounts > 0
       ? packageItem.pricesWithoutDiscounts
-      : calculatedNormalPrice;
+      : packageItem.services.reduce(
+          (total, service) => total + service.price,
+          0,
+        );
 
-  const savings = Math.max(normalPrice - packageItem.basPrice, 0);
-
-  const savingPercentage =
-    normalPrice > 0 ? Math.round((savings / normalPrice) * 100) : 0;
+  const savings = Math.max(
+    normalPrice - packageItem.basPrice,
+    0,
+  );
 
   return createPortal(
     <div
@@ -1253,26 +2120,18 @@ function PackageInfoModal({
       }}
     >
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-        {/* Header */}
-
-        <div className="flex shrink-0 items-start justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
+        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-900 text-white">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-900 text-white">
               <Package size={21} />
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
-                  {packageItem.title}
-                </h2>
+              <h2 className="text-xl font-bold text-slate-900">
+                {packageItem.title}
+              </h2>
 
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-                  Active
-                </span>
-              </div>
-
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="text-sm text-slate-500">
                 Package information and included services.
               </p>
             </div>
@@ -1281,202 +2140,68 @@ function PackageInfoModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Body */}
-
         <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
-          {/* Description */}
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              About this package
-            </p>
-
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {packageItem.description ||
-                "No description has been provided for this package."}
-            </p>
-          </div>
-
-          {/* Pricing */}
+          <p className="text-sm leading-6 text-slate-600">
+            {packageItem.description}
+          </p>
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-medium text-slate-500">
-                Separate Price
-              </p>
+            <MiniPriceCard
+              title="Separate Price"
+              value={formatPrice(normalPrice)}
+            />
 
-              <p className="mt-1 text-lg font-bold text-slate-900">
-                {formatPrice(normalPrice)}
-              </p>
+            <MiniPriceCard
+              title="Package Price"
+              value={formatPrice(packageItem.basPrice)}
+            />
 
-              <p className="mt-1 text-[11px] text-slate-400">
-                Buying services separately
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-              <p className="text-xs font-medium text-blue-700">Package Price</p>
-
-              <p className="mt-1 text-lg font-bold text-blue-900">
-                {formatPrice(packageItem.basPrice)}
-              </p>
-
-              <p className="mt-1 text-[11px] text-blue-600">
-                Customer package price
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-emerald-700">Savings</p>
-
-                {savingPercentage > 0 && (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                    {savingPercentage}%
-                  </span>
-                )}
-              </div>
-
-              <p className="mt-1 text-lg font-bold text-emerald-700">
-                {formatPrice(savings)}
-              </p>
-
-              <p className="mt-1 text-[11px] text-emerald-600">
-                Total package saving
-              </p>
-            </div>
+            <MiniPriceCard
+              title="Savings"
+              value={formatPrice(savings)}
+            />
           </div>
-
-          {/* Included Services */}
 
           <div className="mt-6">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="font-bold text-slate-900">Included Services</h3>
+            <h3 className="font-bold text-slate-900">
+              Included Services
+            </h3>
 
-                <p className="mt-0.5 text-xs text-slate-500">
-                  All services included with this package.
-                </p>
-              </div>
+            <div className="mt-3 space-y-3">
+              {packageItem.services.map((service, index) => (
+                <div
+                  key={service.id}
+                  className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4"
+                >
+                  <div className="flex min-w-0 gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold text-blue-900">
+                      {index + 1}
+                    </div>
 
-              <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900">
-                {packageItem.services.length} Service
-                {packageItem.services.length !== 1 ? "s" : ""}
-              </span>
-            </div>
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        {service.title}
+                      </p>
 
-            {packageItem.services.length > 0 ? (
-              <div className="space-y-3">
-                {packageItem.services.map((service, index) => (
-                  <div
-                    key={service.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold text-blue-900">
-                          {index + 1}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-slate-900">
-                              {service.title}
-                            </p>
-
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                              <Check size={10} />
-                              Included
-                            </span>
-                          </div>
-
-                          <p className="mt-1 text-xs leading-5 text-slate-500">
-                            {service.description ||
-                              "No service description available."}
-                          </p>
-
-                          {service.durationInMinutes > 0 && (
-                            <p className="mt-2 text-[11px] font-medium text-slate-400">
-                              Duration: {service.durationInMinutes} minutes
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <p className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
-                          {formatPrice(service.price)}
-                        </p>
-
-                        <p className="mt-1 text-[10px] text-slate-400">
-                          Separate price
-                        </p>
-                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        {service.description}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200 text-slate-400">
-                  <CarFront size={23} />
+
+                  <span className="shrink-0 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
+                    {formatPrice(service.price)}
+                  </span>
                 </div>
-
-                <p className="mt-3 text-sm font-semibold text-slate-700">
-                  No included services
-                </p>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  This package does not currently contain any services.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Package Saving */}
-
-          {savings > 0 && (
-            <div className="mt-5 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                <BadgePercent size={20} />
-              </div>
-
-              <div>
-                <p className="text-sm font-bold text-emerald-800">
-                  Better Value as a Package
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-emerald-700">
-                  Purchasing these services separately costs{" "}
-                  <span className="font-bold">{formatPrice(normalPrice)}</span>.
-                  With this package, the customer pays{" "}
-                  <span className="font-bold">
-                    {formatPrice(packageItem.basPrice)}
-                  </span>{" "}
-                  and saves{" "}
-                  <span className="font-bold">{formatPrice(savings)}</span>.
-                </p>
-              </div>
+              ))}
             </div>
-          )}
-        </div>
-
-        {/* Footer */}
-
-        <div className="flex shrink-0 justify-end border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
-          >
-            Close
-          </button>
+          </div>
         </div>
       </div>
     </div>,
@@ -1485,7 +2210,7 @@ function PackageInfoModal({
 }
 
 /* =========================================================
-   Section Header
+   Small Components
    ========================================================= */
 
 function SectionHeader({
@@ -1504,17 +2229,17 @@ function SectionHeader({
       </div>
 
       <div>
-        <h2 className="font-bold text-slate-900">{title}</h2>
+        <h2 className="font-bold text-slate-900">
+          {title}
+        </h2>
 
-        <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+        <p className="mt-0.5 text-xs text-slate-500">
+          {description}
+        </p>
       </div>
     </div>
   );
 }
-
-/* =========================================================
-   Input Field
-   ========================================================= */
 
 function InputField({
   label,
@@ -1551,10 +2276,6 @@ function InputField({
   );
 }
 
-/* =========================================================
-   Normal Service Selector
-   ========================================================= */
-
 function SelectorItem({
   title,
   description,
@@ -1572,12 +2293,14 @@ function SelectorItem({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 ${
-        selected ? "bg-blue-50/70" : "hover:bg-slate-50"
+      className={`flex w-full cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-3 text-left ${
+        selected
+          ? "bg-blue-50/70"
+          : "hover:bg-slate-50"
       }`}
     >
       <div
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
           selected
             ? "border-blue-900 bg-blue-900 text-white"
             : "border-slate-300 bg-white"
@@ -1587,23 +2310,21 @@ function SelectorItem({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-800">{title}</p>
+        <p className="truncate text-sm font-semibold text-slate-800">
+          {title}
+        </p>
 
         <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
           {description}
         </p>
       </div>
 
-      <div className="shrink-0 text-right">
-        <p className="text-sm font-bold text-emerald-600">{price}</p>
-      </div>
+      <p className="shrink-0 text-sm font-bold text-emerald-600">
+        {price}
+      </p>
     </button>
   );
 }
-
-/* =========================================================
-   Payment Method
-   ========================================================= */
 
 function PaymentMethodCard({
   title,
@@ -1622,10 +2343,10 @@ function PaymentMethodCard({
     <button
       type="button"
       onClick={onClick}
-      className={`relative cursor-pointer rounded-xl border p-3 text-left transition ${
+      className={`relative cursor-pointer rounded-xl border p-3 text-left ${
         selected
           ? "border-blue-900 bg-blue-50 ring-1 ring-blue-900"
-          : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40"
+          : "border-slate-200 bg-white hover:border-blue-300"
       }`}
     >
       {selected && (
@@ -1636,22 +2357,24 @@ function PaymentMethodCard({
 
       <div
         className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${
-          selected ? "bg-blue-900 text-white" : "bg-slate-100 text-slate-500"
+          selected
+            ? "bg-blue-900 text-white"
+            : "bg-slate-100 text-slate-500"
         }`}
       >
         {icon}
       </div>
 
-      <p className="text-sm font-bold text-slate-800">{title}</p>
+      <p className="text-sm font-bold text-slate-800">
+        {title}
+      </p>
 
-      <p className="mt-0.5 text-[11px] text-slate-500">{description}</p>
+      <p className="mt-0.5 text-[11px] text-slate-500">
+        {description}
+      </p>
     </button>
   );
 }
-
-/* =========================================================
-   Price Row
-   ========================================================= */
 
 function PriceRow({
   title,
@@ -1664,13 +2387,17 @@ function PriceRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-3 ${
-        strong ? "border-t border-slate-200 pt-3" : ""
+      className={`flex items-center justify-between ${
+        strong
+          ? "border-t border-slate-200 pt-3"
+          : ""
       }`}
     >
       <span
         className={
-          strong ? "text-sm font-bold text-slate-800" : "text-sm text-slate-500"
+          strong
+            ? "text-sm font-bold text-slate-800"
+            : "text-sm text-slate-500"
         }
       >
         {title}
@@ -1688,10 +2415,6 @@ function PriceRow({
     </div>
   );
 }
-
-/* =========================================================
-   Summary Card
-   ========================================================= */
 
 function SummaryCard({
   title,
@@ -1713,7 +2436,9 @@ function SummaryCard({
       </div>
 
       <div className="min-w-0">
-        <p className="text-sm font-medium text-slate-500">{title}</p>
+        <p className="text-sm font-medium text-slate-500">
+          {title}
+        </p>
 
         <p className="mt-0.5 truncate text-xl font-bold text-slate-900">
           {value}
@@ -1723,19 +2448,217 @@ function SummaryCard({
   );
 }
 
-/* =========================================================
-   Empty
-   ========================================================= */
-
-function DropdownEmpty({ text }: { text: string }) {
+function TableHeading({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
-    <div className="px-4 py-6 text-center text-xs text-slate-400">{text}</div>
+    <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+      {children}
+    </th>
   );
 }
 
-/* =========================================================
-   Alert
-   ========================================================= */
+function PaymentMethodBadge({
+  paymentMethod,
+}: {
+  paymentMethod: number;
+}) {
+  if (paymentMethod === 2) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
+        <CreditCard size={13} />
+        Card
+      </span>
+    );
+  }
+
+  if (paymentMethod === 1) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+        <Banknote size={13} />
+        Cash
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">
+      Unknown
+    </span>
+  );
+}
+
+function OrderStatusBadge({
+  status,
+  isPaid,
+}: {
+  status: number;
+  isPaid: boolean;
+}) {
+  if (!isPaid) {
+    return (
+      <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+        Unpaid
+      </span>
+    );
+  }
+
+  if (status === 3) {
+    return (
+      <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+        Cancelled
+      </span>
+    );
+  }
+
+  if (status === 2) {
+    return (
+      <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+        In Progress
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+      <Check size={11} />
+      Paid
+    </span>
+  );
+}
+
+function MobileInfo({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-3">
+      <p className="text-[11px] font-medium text-slate-400">
+        {label}
+      </p>
+
+      <p className="mt-1 truncate text-sm font-semibold text-slate-700">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function DetailCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <p className="text-xs font-medium text-slate-500">
+        {label}
+      </p>
+
+      <p className="mt-1 text-sm font-semibold text-slate-900">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function OrderItem({
+  icon,
+  name,
+  price,
+}: {
+  icon: ReactNode;
+  name: string;
+  price: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-900">
+          {icon}
+        </div>
+
+        <p className="truncate text-sm font-semibold text-slate-800">
+          {name}
+        </p>
+      </div>
+
+      <span className="shrink-0 text-sm font-bold text-emerald-700">
+        {price}
+      </span>
+    </div>
+  );
+}
+
+function MiniPriceCard({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs text-slate-500">
+        {title}
+      </p>
+
+      <p className="mt-1 text-lg font-bold text-slate-900">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function DropdownEmpty({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div className="px-4 py-6 text-center text-xs text-slate-400">
+      {text}
+    </div>
+  );
+}
+
+function SmallEmpty({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+      {text}
+    </div>
+  );
+}
+
+function PaymentsEmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+        <ReceiptText size={26} />
+      </div>
+
+      <h3 className="font-semibold text-slate-900">
+        No payments found
+      </h3>
+
+      <p className="mt-1 max-w-sm text-sm text-slate-500">
+        No payments match the current search or no car wash payments have
+        been created yet.
+      </p>
+    </div>
+  );
+}
 
 function CustomAlert({
   alert,
@@ -1745,51 +2668,34 @@ function CustomAlert({
   onClose: () => void;
 }) {
   const styles = {
-    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-
-    error: "border-red-200 bg-red-50 text-red-800",
-
-    warning: "border-amber-200 bg-amber-50 text-amber-800",
-
-    info: "border-blue-200 bg-blue-50 text-blue-800",
-  };
-
-  const iconStyles = {
-    success: "bg-emerald-100 text-emerald-700",
-
-    error: "bg-red-100 text-red-700",
-
-    warning: "bg-amber-100 text-amber-700",
-
-    info: "bg-blue-100 text-blue-700",
+    success:
+      "border-emerald-200 bg-emerald-50 text-emerald-800",
+    error:
+      "border-red-200 bg-red-50 text-red-800",
+    warning:
+      "border-amber-200 bg-amber-50 text-amber-800",
+    info:
+      "border-blue-200 bg-blue-50 text-blue-800",
   };
 
   return (
     <div
       className={`flex items-start gap-3 rounded-2xl border p-4 shadow-xl ${styles[alert.variant]}`}
     >
-      <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconStyles[alert.variant]}`}
-      >
-        {alert.variant === "success" ? (
-          <Check size={18} />
-        ) : alert.variant === "info" ? (
-          <Info size={18} />
-        ) : (
-          <Sparkles size={18} />
-        )}
-      </div>
-
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">{alert.title}</p>
+        <p className="font-semibold">
+          {alert.title}
+        </p>
 
-        <p className="mt-1 text-sm opacity-80">{alert.description}</p>
+        <p className="mt-1 text-sm opacity-80">
+          {alert.description}
+        </p>
       </div>
 
       <button
         type="button"
         onClick={onClose}
-        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition hover:bg-black/5"
+        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-black/5"
       >
         <X size={17} />
       </button>

@@ -26,3 +26,17 @@ export const pay = async (paymentData: FormData) => {
         throw error;
     }
 };
+
+export const getPayments = async () => {
+    try {
+        const token = getToken();
+        const response = await axios.get(`${PAYMENTS_API_URL}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
