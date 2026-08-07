@@ -174,18 +174,18 @@ export default function Payments() {
     void getAllPackages();
   }, []);
 
-    useEffect(() => {
-  if (!pageAlert.visible) return;
+  useEffect(() => {
+    if (!pageAlert.visible) return;
 
-  const timer = setTimeout(() => {
-    setPageAlert((prev) => ({
-      ...prev,
-      visible: false,
-    }));
-  }, 2000);
+    const timer = setTimeout(() => {
+      setPageAlert((prev) => ({
+        ...prev,
+        visible: false,
+      }));
+    }, 2000);
 
-  return () => clearTimeout(timer);
-}, [pageAlert.visible]);
+    return () => clearTimeout(timer);
+  }, [pageAlert.visible]);
 
   /* =========================================================
      Close selector dropdown
@@ -387,10 +387,7 @@ export default function Payments() {
      Form Change
      ========================================================= */
 
-  const handleChange = (
-    field: keyof PaymentForm,
-    value: string | 1 | 2,
-  ) => {
+  const handleChange = (field: keyof PaymentForm, value: string | 1 | 2) => {
     setForm((previous) => ({
       ...previous,
       [field]: value,
@@ -456,10 +453,7 @@ export default function Payments() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (
-      selectedPackageIds.length === 0 &&
-      selectedServiceIds.length === 0
-    ) {
+    if (selectedPackageIds.length === 0 && selectedServiceIds.length === 0) {
       setPageAlert({
         visible: true,
         variant: "warning",
@@ -580,9 +574,7 @@ export default function Payments() {
               <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/30 border-t-white" />
 
               <p className="text-sm font-medium text-white">
-                {isSubmitting
-                  ? "Processing payment..."
-                  : "Loading packages..."}
+                {isSubmitting ? "Processing payment..." : "Loading packages..."}
               </p>
             </div>
           </div>,
@@ -629,11 +621,7 @@ export default function Payments() {
             disabled={isLoading || isSubmitting}
             className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <RefreshCcw
-              size={16}
-              className={isLoading ? "animate-spin" : ""}
-            />
-
+            <RefreshCcw size={16} className={isLoading ? "animate-spin" : ""} />
             Refresh
           </button>
         </div>
@@ -692,9 +680,7 @@ export default function Payments() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setIsSelectorOpen((previous) => !previous)
-                      }
+                      onClick={() => setIsSelectorOpen((previous) => !previous)}
                       className={`flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border bg-white px-3.5 py-2.5 text-left transition ${
                         isSelectorOpen
                           ? "border-blue-500 ring-4 ring-blue-100"
@@ -758,10 +744,7 @@ export default function Payments() {
                           <div className="border-b border-slate-100">
                             <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-50 px-4 py-2.5">
                               <div className="flex items-center gap-2">
-                                <Package
-                                  size={15}
-                                  className="text-blue-900"
-                                />
+                                <Package size={15} className="text-blue-900" />
 
                                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                                   Packages
@@ -775,8 +758,9 @@ export default function Payments() {
 
                             {filteredPackages.length > 0 ? (
                               filteredPackages.map((item) => {
-                                const selected =
-                                  selectedPackageIds.includes(item.id);
+                                const selected = selectedPackageIds.includes(
+                                  item.id,
+                                );
 
                                 return (
                                   <PackageSelectorItem
@@ -784,12 +768,8 @@ export default function Payments() {
                                     item={item}
                                     selected={selected}
                                     formatPrice={formatPrice}
-                                    onSelect={() =>
-                                      togglePackage(item.id)
-                                    }
-                                    onInfo={() =>
-                                      setSelectedInfoPackage(item)
-                                    }
+                                    onSelect={() => togglePackage(item.id)}
+                                    onInfo={() => setSelectedInfoPackage(item)}
                                   />
                                 );
                               })
@@ -805,10 +785,7 @@ export default function Payments() {
                           <div>
                             <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-50 px-4 py-2.5">
                               <div className="flex items-center gap-2">
-                                <CarFront
-                                  size={15}
-                                  className="text-blue-900"
-                                />
+                                <CarFront size={15} className="text-blue-900" />
 
                                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                                   Individual Services
@@ -822,8 +799,9 @@ export default function Payments() {
 
                             {filteredServices.length > 0 ? (
                               filteredServices.map((item) => {
-                                const selected =
-                                  selectedServiceIds.includes(item.id);
+                                const selected = selectedServiceIds.includes(
+                                  item.id,
+                                );
 
                                 return (
                                   <SelectorItem
@@ -832,9 +810,7 @@ export default function Payments() {
                                     description={item.description}
                                     price={formatPrice(item.price)}
                                     selected={selected}
-                                    onClick={() =>
-                                      toggleService(item.id)
-                                    }
+                                    onClick={() => toggleService(item.id)}
                                   />
                                 );
                               })
@@ -934,9 +910,7 @@ export default function Payments() {
 
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    removeSelectedItem(item)
-                                  }
+                                  onClick={() => removeSelectedItem(item)}
                                   aria-label={`Remove ${item.title}`}
                                   className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
                                 >
@@ -982,18 +956,14 @@ export default function Payments() {
                     label="Customer Name"
                     value={form.customerName}
                     placeholder="Enter customer name"
-                    onChange={(value) =>
-                      handleChange("customerName", value)
-                    }
+                    onChange={(value) => handleChange("customerName", value)}
                   />
 
                   <InputField
                     label="Customer Phone"
                     value={form.customerPhone}
                     placeholder="Enter phone number"
-                    onChange={(value) =>
-                      handleChange("customerPhone", value)
-                    }
+                    onChange={(value) => handleChange("customerPhone", value)}
                   />
 
                   <InputField
@@ -1001,18 +971,14 @@ export default function Payments() {
                     value={form.vehicleType}
                     type="number"
                     placeholder="Enter vehicle type"
-                    onChange={(value) =>
-                      handleChange("vehicleType", value)
-                    }
+                    onChange={(value) => handleChange("vehicleType", value)}
                   />
 
                   <InputField
                     label="Vehicle No"
                     value={form.VehicleNumber}
                     placeholder="Example: CAB-1234"
-                    onChange={(value) =>
-                      handleChange("VehicleNumber", value)
-                    }
+                    onChange={(value) => handleChange("VehicleNumber", value)}
                   />
                 </div>
               </section>
@@ -1042,9 +1008,7 @@ export default function Payments() {
                       description="Cash payment"
                       icon={<Banknote size={20} />}
                       selected={form.paymentMethod === 2}
-                      onClick={() =>
-                        handleChange("paymentMethod", 2)
-                      }
+                      onClick={() => handleChange("paymentMethod", 2)}
                     />
 
                     <PaymentMethodCard
@@ -1052,9 +1016,7 @@ export default function Payments() {
                       description="Card payment"
                       icon={<CreditCard size={20} />}
                       selected={form.paymentMethod === 1}
-                      onClick={() =>
-                        handleChange("paymentMethod", 1)
-                      }
+                      onClick={() => handleChange("paymentMethod", 1)}
                     />
                   </div>
 
@@ -1117,10 +1079,7 @@ export default function Payments() {
                         Total Payable
                       </span>
 
-                      <Sparkles
-                        size={18}
-                        className="text-emerald-600"
-                      />
+                      <Sparkles size={18} className="text-emerald-600" />
                     </div>
 
                     <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-700">
@@ -1137,18 +1096,13 @@ export default function Payments() {
                   <button
                     type="submit"
                     disabled={
-                      isSubmitting ||
-                      isLoading ||
-                      selectedItems.length === 0
+                      isSubmitting || isLoading || selectedItems.length === 0
                     }
                     className="mt-5 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2
-                          size={18}
-                          className="animate-spin"
-                        />
+                        <Loader2 size={18} className="animate-spin" />
                         Processing...
                       </>
                     ) : (
@@ -1190,10 +1144,7 @@ function PackageSelectorItem({
   onSelect: () => void;
   onInfo: () => void;
 }) {
-  const savings = Math.max(
-    item.pricesWithoutDiscounts - item.basPrice,
-    0,
-  );
+  const savings = Math.max(item.pricesWithoutDiscounts - item.basPrice, 0);
 
   return (
     <div
@@ -1290,9 +1241,7 @@ function PackageInfoModal({
   const savings = Math.max(normalPrice - packageItem.basPrice, 0);
 
   const savingPercentage =
-    normalPrice > 0
-      ? Math.round((savings / normalPrice) * 100)
-      : 0;
+    normalPrice > 0 ? Math.round((savings / normalPrice) * 100) : 0;
 
   return createPortal(
     <div
@@ -1372,9 +1321,7 @@ function PackageInfoModal({
             </div>
 
             <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-              <p className="text-xs font-medium text-blue-700">
-                Package Price
-              </p>
+              <p className="text-xs font-medium text-blue-700">Package Price</p>
 
               <p className="mt-1 text-lg font-bold text-blue-900">
                 {formatPrice(packageItem.basPrice)}
@@ -1387,9 +1334,7 @@ function PackageInfoModal({
 
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-emerald-700">
-                  Savings
-                </p>
+                <p className="text-xs font-medium text-emerald-700">Savings</p>
 
                 {savingPercentage > 0 && (
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
@@ -1413,9 +1358,7 @@ function PackageInfoModal({
           <div className="mt-6">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-slate-900">
-                  Included Services
-                </h3>
+                <h3 className="font-bold text-slate-900">Included Services</h3>
 
                 <p className="mt-0.5 text-xs text-slate-500">
                   All services included with this package.
@@ -1511,18 +1454,13 @@ function PackageInfoModal({
 
                 <p className="mt-1 text-xs leading-5 text-emerald-700">
                   Purchasing these services separately costs{" "}
-                  <span className="font-bold">
-                    {formatPrice(normalPrice)}
-                  </span>
-                  . With this package, the customer pays{" "}
+                  <span className="font-bold">{formatPrice(normalPrice)}</span>.
+                  With this package, the customer pays{" "}
                   <span className="font-bold">
                     {formatPrice(packageItem.basPrice)}
                   </span>{" "}
                   and saves{" "}
-                  <span className="font-bold">
-                    {formatPrice(savings)}
-                  </span>
-                  .
+                  <span className="font-bold">{formatPrice(savings)}</span>.
                 </p>
               </div>
             </div>
@@ -1568,9 +1506,7 @@ function SectionHeader({
       <div>
         <h2 className="font-bold text-slate-900">{title}</h2>
 
-        <p className="mt-0.5 text-xs text-slate-500">
-          {description}
-        </p>
+        <p className="mt-0.5 text-xs text-slate-500">{description}</p>
       </div>
     </div>
   );
@@ -1651,9 +1587,7 @@ function SelectorItem({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-800">
-          {title}
-        </p>
+        <p className="truncate text-sm font-semibold text-slate-800">{title}</p>
 
         <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
           {description}
@@ -1702,9 +1636,7 @@ function PaymentMethodCard({
 
       <div
         className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${
-          selected
-            ? "bg-blue-900 text-white"
-            : "bg-slate-100 text-slate-500"
+          selected ? "bg-blue-900 text-white" : "bg-slate-100 text-slate-500"
         }`}
       >
         {icon}
@@ -1712,9 +1644,7 @@ function PaymentMethodCard({
 
       <p className="text-sm font-bold text-slate-800">{title}</p>
 
-      <p className="mt-0.5 text-[11px] text-slate-500">
-        {description}
-      </p>
+      <p className="mt-0.5 text-[11px] text-slate-500">{description}</p>
     </button>
   );
 }
@@ -1740,9 +1670,7 @@ function PriceRow({
     >
       <span
         className={
-          strong
-            ? "text-sm font-bold text-slate-800"
-            : "text-sm text-slate-500"
+          strong ? "text-sm font-bold text-slate-800" : "text-sm text-slate-500"
         }
       >
         {title}
@@ -1785,9 +1713,7 @@ function SummaryCard({
       </div>
 
       <div className="min-w-0">
-        <p className="text-sm font-medium text-slate-500">
-          {title}
-        </p>
+        <p className="text-sm font-medium text-slate-500">{title}</p>
 
         <p className="mt-0.5 truncate text-xl font-bold text-slate-900">
           {value}
@@ -1803,9 +1729,7 @@ function SummaryCard({
 
 function DropdownEmpty({ text }: { text: string }) {
   return (
-    <div className="px-4 py-6 text-center text-xs text-slate-400">
-      {text}
-    </div>
+    <div className="px-4 py-6 text-center text-xs text-slate-400">{text}</div>
   );
 }
 
@@ -1821,31 +1745,23 @@ function CustomAlert({
   onClose: () => void;
 }) {
   const styles = {
-    success:
-      "border-emerald-200 bg-emerald-50 text-emerald-800",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
 
-    error:
-      "border-red-200 bg-red-50 text-red-800",
+    error: "border-red-200 bg-red-50 text-red-800",
 
-    warning:
-      "border-amber-200 bg-amber-50 text-amber-800",
+    warning: "border-amber-200 bg-amber-50 text-amber-800",
 
-    info:
-      "border-blue-200 bg-blue-50 text-blue-800",
+    info: "border-blue-200 bg-blue-50 text-blue-800",
   };
 
   const iconStyles = {
-    success:
-      "bg-emerald-100 text-emerald-700",
+    success: "bg-emerald-100 text-emerald-700",
 
-    error:
-      "bg-red-100 text-red-700",
+    error: "bg-red-100 text-red-700",
 
-    warning:
-      "bg-amber-100 text-amber-700",
+    warning: "bg-amber-100 text-amber-700",
 
-    info:
-      "bg-blue-100 text-blue-700",
+    info: "bg-blue-100 text-blue-700",
   };
 
   return (
@@ -1867,9 +1783,7 @@ function CustomAlert({
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{alert.title}</p>
 
-        <p className="mt-1 text-sm opacity-80">
-          {alert.description}
-        </p>
+        <p className="mt-1 text-sm opacity-80">{alert.description}</p>
       </div>
 
       <button
