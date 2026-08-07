@@ -6,6 +6,7 @@ import AdminLayout from "./layouts/admin-layout"
 import Dayend from "./pages/dayend"
 import CarwashServices from "./pages/services"
 import Packages from "./pages/packages"
+import Payments from "./pages/payments"
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
       {/* Admin Dashboard Routes */}
       <Route element={<AdminLayout><CarwashServices /></AdminLayout>} path="/services" />
       <Route element={<AdminLayout><Packages /></AdminLayout>} path="/packages" />
+      <Route element={<AdminLayout><Payments /></AdminLayout>} path="/payments" />
       <Route element={<AdminLayout><Dayend /></AdminLayout>} path="/dayend" />
       <Route element={<AdminLayout><Reports /></AdminLayout>} path="/reports" />
       <Route element={<AdminLayout><SettingsPage /></AdminLayout>} path="/settings" />

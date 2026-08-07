@@ -70,3 +70,17 @@ export const deleteCarPackage = async (serviceId: string) => {
     throw error;
   }
 };
+
+export const getAllCarPackages = async () => {
+  try {
+    const token = getToken();
+    const response = await axios.get(`${CAR_API_URL}with-services`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
