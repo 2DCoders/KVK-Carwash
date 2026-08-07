@@ -1027,7 +1027,7 @@ export default function Payments() {
 
                           <td className="px-5 py-4">
                             <p className="text-sm font-semibold text-slate-800">
-                              {payment.customerName || "Walk-in Customer"}
+                              {payment.customerName || "N/A"}
                             </p>
 
                             <p className="mt-0.5 text-xs text-slate-500">
@@ -1132,7 +1132,7 @@ export default function Payments() {
                       <div className="mt-4 grid grid-cols-2 gap-3">
                         <MobileInfo
                           label="Customer"
-                          value={payment.customerName || "Walk-in"}
+                          value={payment.customerName || "N/A"}
                         />
 
                         <MobileInfo
@@ -1866,7 +1866,7 @@ function PaymentDetailsModal({
 
             <DetailCard
               label="Customer"
-              value={payment.customerName || "Walk-in Customer"}
+              value={payment.customerName || "N/A"}
             />
 
             <DetailCard
