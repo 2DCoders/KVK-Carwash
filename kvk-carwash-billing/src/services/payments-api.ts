@@ -2,7 +2,7 @@ import axios from "axios";
 import { getEnv } from "@/env";
 
 const { API_URL } = getEnv();
-const PAYMENTS_API_URL = `${API_URL}gym/payments/`;
+const PAYMENTS_API_URL = `${API_URL}car-service/wash-order/`;
 
 const getToken = () => {
     const cashier = localStorage.getItem("cashier")
@@ -12,17 +12,17 @@ const getToken = () => {
     return cashier ? cashier.token : null;
 };
 
-export const getPayments = async (startDate: string, endDate: string) => {
-    const token = getToken();
+export const pay = async (paymentData: FormData) => {
     try {
-        const query = `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}`;
-        const response = await axios.get(`${PAYMENTS_API_URL}${query}`, {
+        const token = getToken();
+        const response = await axios.post(`${PAYMENTS_API_URL}`, paymentData, {
             headers: {
-                Authorization: `Bearer ${token}`
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "multipart/form-data",
             },
         });
         return response.data;
     } catch (error) {
         throw error;
     }
-}
+};

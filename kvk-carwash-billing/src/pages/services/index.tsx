@@ -156,6 +156,7 @@ export default function CarwashServices() {
     description: "",
   });
 
+  
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const getCarwashServices = async () => {
@@ -184,6 +185,19 @@ export default function CarwashServices() {
   useEffect(() => {
     getCarwashServices();
   }, []);
+
+    useEffect(() => {
+  if (!pageAlert.visible) return;
+
+  const timer = setTimeout(() => {
+    setPageAlert((prev) => ({
+      ...prev,
+      visible: false,
+    }));
+  }, 2000);
+
+  return () => clearTimeout(timer);
+}, [pageAlert.visible]);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
