@@ -1,6 +1,5 @@
 import { Route, Routes, Navigate } from "react-router-dom"
 import Login from "./pages/login"
-import Reports from "./pages/reports"
 import SettingsPage from "./pages/settings"
 import AdminLayout from "./layouts/admin-layout"
 import Dayend from "./pages/dayend"
@@ -18,7 +17,6 @@ function App() {
       <Route element={<AdminLayout><Packages /></AdminLayout>} path="/packages" />
       <Route element={<AdminLayout><Payments /></AdminLayout>} path="/payments" />
       <Route element={<AdminLayout><Dayend /></AdminLayout>} path="/dayend" />
-      <Route element={<AdminLayout><Reports /></AdminLayout>} path="/reports" />
       <Route element={<AdminLayout><SettingsPage /></AdminLayout>} path="/settings" />
       
       {/* Redirect to dashboard */}

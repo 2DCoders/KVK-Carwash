@@ -1,8 +1,7 @@
 import Alert from "@/components/ui/alert";
 import { changePassword } from "@/services/auth-api";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
 export default function SettingsPage() {
   const [pageAlert, setPageAlert] = useState<{
@@ -24,18 +23,6 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const navigate = useNavigate();
-
-  const dayendData = localStorage.getItem("dayEndData")
-    ? JSON.parse(localStorage.getItem("dayEndData") as string)
-    : null;
-
-  useEffect(() => {
-    if (!dayendData) {
-      navigate("/dayend");
-    }
-  }, [dayendData]);
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
