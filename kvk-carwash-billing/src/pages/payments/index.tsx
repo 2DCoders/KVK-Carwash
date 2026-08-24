@@ -998,10 +998,6 @@ export default function Payments() {
                 <tbody className="divide-y divide-slate-100">
                   {paginatedPayments.length > 0 ? (
                     paginatedPayments.map((payment) => {
-                      const totalItems =
-                        (payment.packages?.length ?? 0) +
-                        (payment.services?.length ?? 0);
-
                       return (
                         <tr
                           key={payment.carWashOrderId}

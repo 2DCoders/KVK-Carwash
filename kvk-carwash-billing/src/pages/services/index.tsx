@@ -1119,7 +1119,6 @@ function ServiceFormModal({
   onDrop,
   onDragOver,
   onDragLeave,
-  onRemoveImage,
   onClose,
   onSubmit,
 }: ServiceFormModalProps) {

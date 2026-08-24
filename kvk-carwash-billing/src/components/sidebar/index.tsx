@@ -1,12 +1,9 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Users,
-  Dumbbell,
   CreditCard,
   CheckSquare,
   Settings,
   ChevronDown,
-  Ticket,
   CarFront,
   Boxes,
 } from "lucide-react";

@@ -1104,7 +1104,6 @@ function PackageFormModal({
   onDrop,
   onDragOver,
   onDragLeave,
-  onRemoveImage,
   onClose,
   onSubmit,
 }: PackageFormModalProps) {

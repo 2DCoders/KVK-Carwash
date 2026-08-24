@@ -1136,8 +1136,6 @@ function CloseDayConfirmModal({
   workingDate,
   totalRevenue,
   totalTransactions,
-  prevDayAmount,
-  cashRevenue,
   expectedCashTotal,
   actualCash,
   discrepancy,
