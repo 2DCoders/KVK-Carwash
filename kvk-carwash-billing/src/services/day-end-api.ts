@@ -2,7 +2,7 @@ import axios from "axios";
 import { getEnv } from "@/env";
 
 const { API_URL } = getEnv();
-const DAYEND_API_URL = `${API_URL}gym/dayend/`;
+const DAYEND_API_URL = `${API_URL}car-service/dayend/`;
 
 const getToken = () => {
   const cashier = localStorage.getItem("cashier")
