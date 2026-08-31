@@ -25,6 +25,7 @@ import {
   getCarServices,
   updateCarService,
 } from "@/services/carwash-services-api";
+import { useNavigate } from "react-router-dom";
 
 type Service = {
   id: string;
@@ -156,8 +157,19 @@ export default function CarwashServices() {
     description: "",
   });
 
-  
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const navigate = useNavigate();
+
+  const dayendData = localStorage.getItem("dayEndData")
+    ? JSON.parse(localStorage.getItem("dayEndData") as string)
+    : null;
+
+  useEffect(() => {
+    if (!dayendData) {
+      navigate("/dayend");
+    }
+  }, [dayendData]);
 
   const getCarwashServices = async () => {
     try {
@@ -186,18 +198,18 @@ export default function CarwashServices() {
     getCarwashServices();
   }, []);
 
-    useEffect(() => {
-  if (!pageAlert.visible) return;
+  useEffect(() => {
+    if (!pageAlert.visible) return;
 
-  const timer = setTimeout(() => {
-    setPageAlert((prev) => ({
-      ...prev,
-      visible: false,
-    }));
-  }, 2000);
+    const timer = setTimeout(() => {
+      setPageAlert((prev) => ({
+        ...prev,
+        visible: false,
+      }));
+    }, 2000);
 
-  return () => clearTimeout(timer);
-}, [pageAlert.visible]);
+    return () => clearTimeout(timer);
+  }, [pageAlert.visible]);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -539,7 +551,6 @@ export default function CarwashServices() {
           description: `${serviceData.title} was added successfully.`,
         });
       } else if (selectedService) {
-        
         payload.append("Id", selectedService.id);
         await updateCarService(payload);
 
@@ -602,20 +613,21 @@ export default function CarwashServices() {
 
   return (
     <main className="min-h-screen bg-slate-50/60">
-      {pageAlert.visible && createPortal(
-        <div className="fixed right-4 top-4 z-[99999] w-[calc(100%-2rem)] max-w-md">
-          <CustomAlert
-            alert={pageAlert}
-            onClose={() =>
-              setPageAlert((previous) => ({
-                ...previous,
-                visible: false,
-              }))
-            }
-          />
-        </div>,
-        document.body,
-      )}
+      {pageAlert.visible &&
+        createPortal(
+          <div className="fixed right-4 top-4 z-[99999] w-[calc(100%-2rem)] max-w-md">
+            <CustomAlert
+              alert={pageAlert}
+              onClose={() =>
+                setPageAlert((previous) => ({
+                  ...previous,
+                  visible: false,
+                }))
+              }
+            />
+          </div>,
+          document.body,
+        )}
 
       {(isLoading || isSubmitting) &&
         createPortal(

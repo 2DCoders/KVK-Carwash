@@ -27,6 +27,7 @@ import {
   getCarPackages,
   updateCarPackage,
 } from "@/services/carwash-packages-api";
+import { useNavigate } from "react-router-dom";
 
 type ServiceOption = {
   id: string;
@@ -189,18 +190,30 @@ export default function Packages() {
     description: "",
   });
 
+  const navigate = useNavigate();
+
+  const dayendData = localStorage.getItem("dayEndData")
+    ? JSON.parse(localStorage.getItem("dayEndData") as string)
+    : null;
+
   useEffect(() => {
-  if (!pageAlert.visible) return;
+    if (!dayendData) {
+      navigate("/dayend");
+    }
+  }, [dayendData]);
 
-  const timer = setTimeout(() => {
-    setPageAlert((prev) => ({
-      ...prev,
-      visible: false,
-    }));
-  }, 2000);
+  useEffect(() => {
+    if (!pageAlert.visible) return;
 
-  return () => clearTimeout(timer);
-}, [pageAlert.visible]);
+    const timer = setTimeout(() => {
+      setPageAlert((prev) => ({
+        ...prev,
+        visible: false,
+      }));
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [pageAlert.visible]);
 
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -1783,7 +1796,7 @@ function CustomAlert({
     warning: "border-amber-200 bg-amber-50 text-amber-800",
     info: "border-blue-200 bg-blue-50 text-blue-800",
   };
-  
+
   return (
     <div
       className={`flex items-start gap-3 rounded-2xl border p-4 shadow-lg ${styles[alert.variant]}`}

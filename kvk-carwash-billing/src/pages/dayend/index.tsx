@@ -186,13 +186,7 @@ export default function Dayend() {
       isHoldAmountValid &&
       (isDiscrepancyZero || cashRemark.trim() !== "")
     );
-  }, [
-    isCountEntered,
-    isPageLocked,
-    isHoldAmountValid,
-    isDiscrepancyZero,
-    cashRemark,
-  ]);
+  }, [isCountEntered, isPageLocked, isHoldAmountValid, isDiscrepancyZero, cashRemark]);
 
   /* =========================================================
      Data Loading
@@ -202,12 +196,12 @@ export default function Dayend() {
     try {
       const startDate = date;
 
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + 1);
 
-      const endDate = nextDate.toISOString().split("T")[0];
+    const endDate = nextDate.toISOString().split("T")[0];
 
-      const response = await getFinancialSummary(startDate, endDate);
+    const response = await getFinancialSummary(startDate, endDate);
       const summary =
         response?.additionalData?.response ??
         response?.response ??
@@ -360,14 +354,7 @@ export default function Dayend() {
       autoTable(doc, {
         startY: 37,
         theme: "grid",
-        head: [
-          [
-            "Working Business Date",
-            "Total Transactions",
-            "Total Daily Revenue",
-            "Reconciliation Status",
-          ],
-        ],
+        head: [["Working Business Date", "Total Transactions", "Total Daily Revenue", "Reconciliation Status"]],
         body: [
           [
             workingDateFormatted,
@@ -425,7 +412,11 @@ export default function Dayend() {
               ? `${Math.round((financialSummary.payPalRevenue / financialSummary.totalRevenue) * 100)}%`
               : "0%",
           ],
-          ["TOTAL REVENUE", formatPrice(financialSummary.totalRevenue), "100%"],
+          [
+            "TOTAL REVENUE",
+            formatPrice(financialSummary.totalRevenue),
+            "100%",
+          ],
         ],
         headStyles: {
           fillColor: [30, 58, 138],
@@ -450,26 +441,10 @@ export default function Dayend() {
         theme: "grid",
         head: [["Reconciliation Item", "Amount (LKR)", "Audit Description"]],
         body: [
-          [
-            "Opening Cash (From Previous Day)",
-            formatPrice(prevDayAmount),
-            "Carried forward opening drawer float",
-          ],
-          [
-            "Today's Cash Sales Revenue",
-            formatPrice(financialSummary.cashRevenue),
-            "Total physical cash received today",
-          ],
-          [
-            "Total Expected Cash in Drawer",
-            formatPrice(expectedCashTotal),
-            "Opening Float + Today's Cash Sales",
-          ],
-          [
-            "Actual Physical Cash Counted",
-            formatPrice(actualCash),
-            "Verified drawer count entered by cashier",
-          ],
+          ["Opening Cash (From Previous Day)", formatPrice(prevDayAmount), "Carried forward opening drawer float"],
+          ["Today's Cash Sales Revenue", formatPrice(financialSummary.cashRevenue), "Total physical cash received today"],
+          ["Total Expected Cash in Drawer", formatPrice(expectedCashTotal), "Opening Float + Today's Cash Sales"],
+          ["Actual Physical Cash Counted", formatPrice(actualCash), "Verified drawer count entered by cashier"],
           [
             "Reconciliation Discrepancy",
             formatPrice(Math.abs(discrepancy)),
@@ -500,21 +475,9 @@ export default function Dayend() {
         theme: "grid",
         head: [["Settlement Detail", "Amount (LKR)", "Action"]],
         body: [
-          [
-            "Physical Cash in Register",
-            formatPrice(actualCash),
-            "Total counted cash",
-          ],
-          [
-            "Hold Float for Next Day",
-            formatPrice(holdAmount),
-            "Remains in register drawer for tomorrow's opening float",
-          ],
-          [
-            "Net Cash to Bank / Safe Deposit",
-            formatPrice(netBankDeposit),
-            "To be securely deposited into bank/safe",
-          ],
+          ["Physical Cash in Register", formatPrice(actualCash), "Total counted cash"],
+          ["Hold Float for Next Day", formatPrice(holdAmount), "Remains in register drawer for tomorrow's opening float"],
+          ["Net Cash to Bank / Safe Deposit", formatPrice(netBankDeposit), "To be securely deposited into bank/safe"],
         ],
         headStyles: {
           fillColor: [30, 58, 138],
@@ -553,17 +516,14 @@ export default function Dayend() {
       doc.text("Prepared By (Cashier Signature)", 14, signY + 5);
       doc.text("Verified By (Manager / Owner)", 140, signY + 5);
 
-      const fileNameDate = (dayEndData?.currentDate || defaultDate).split(
-        "T",
-      )[0];
+      const fileNameDate = (dayEndData?.currentDate || defaultDate).split("T")[0];
       doc.save(`KVK_DayEnd_Report_${fileNameDate}.pdf`);
 
       setPageAlert({
         visible: true,
         variant: "success",
         title: "Report Downloaded",
-        description:
-          "Day end reconciliation PDF report has been generated successfully.",
+        description: "Day end reconciliation PDF report has been generated successfully.",
       });
     } catch (error) {
       console.error("PDF generation failed:", error);
@@ -636,8 +596,7 @@ export default function Dayend() {
                 )}
               </div>
               <p className="text-sm text-slate-500">
-                Reconcile cash drawer balances, verify daily revenue, and
-                finalize the business day.
+                Reconcile cash drawer balances, verify daily revenue, and finalize the business day.
               </p>
             </div>
           </div>
@@ -695,8 +654,7 @@ export default function Dayend() {
                 <strong className="font-semibold">
                   {formatDateDisplay(dayEndData?.currentDate)}
                 </strong>
-                ) is set to a future date. Day end closing is locked until that
-                working date arrives.
+                ) is set to a future date. Day end closing is locked until that working date arrives.
               </p>
             </div>
           </div>
@@ -803,8 +761,7 @@ export default function Dayend() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
                 <label className="mb-1.5 flex items-center justify-between text-sm font-semibold text-slate-800">
                   <span>
-                    Actual Physical Cash Counted{" "}
-                    <span className="text-red-500">*</span>
+                    Actual Physical Cash Counted <span className="text-red-500">*</span>
                   </span>
                   <span className="text-xs font-normal text-slate-500">
                     Count notes and coins in drawer
@@ -891,8 +848,7 @@ export default function Dayend() {
                 <div className="space-y-1.5">
                   <label className="flex items-center justify-between text-sm font-semibold text-slate-800">
                     <span>
-                      Discrepancy Reason / Remark{" "}
-                      <span className="text-red-500">*</span>
+                      Discrepancy Reason / Remark <span className="text-red-500">*</span>
                     </span>
                     <span className="text-xs font-semibold text-rose-600">
                       Required
@@ -908,8 +864,7 @@ export default function Dayend() {
                   />
                   {!cashRemark.trim() && (
                     <p className="text-xs font-medium text-rose-600">
-                      Please enter the reason for the cash discrepancy to enable
-                      day closing.
+                      Please enter the reason for the cash discrepancy to enable day closing.
                     </p>
                   )}
                 </div>
@@ -964,8 +919,7 @@ export default function Dayend() {
 
                   {!isHoldAmountValid && (
                     <p className="mt-1.5 text-xs font-medium text-red-600">
-                      Hold amount cannot exceed actual counted cash (
-                      {formatPrice(actualCash)}).
+                      Hold amount cannot exceed actual counted cash ({formatPrice(actualCash)}).
                     </p>
                   )}
                   <p className="mt-1 text-xs text-slate-500">
@@ -993,10 +947,7 @@ export default function Dayend() {
                 {/* Closing Notes */}
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-800">
-                    Closing Notes{" "}
-                    <span className="text-xs font-normal text-slate-500">
-                      (Optional)
-                    </span>
+                    Closing Notes <span className="text-xs font-normal text-slate-500">(Optional)</span>
                   </label>
                   <textarea
                     rows={3}
@@ -1063,7 +1014,7 @@ export default function Dayend() {
       {/* Success Modal */}
       {showSuccessModal && (
         <DayEndSuccessModal
-          workingDate={dayEndData?.currentDate || defaultDate}
+          workingDate={dayEndData?.currentDate.toString()}
           totalRevenue={financialSummary.totalRevenue}
           actualCash={actualCash}
           formatPrice={formatPrice}
@@ -1288,9 +1239,7 @@ function CloseDayConfirmModal({
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">
-                Reconciliation Discrepancy:
-              </span>
+              <span className="text-slate-500">Reconciliation Discrepancy:</span>
               <span
                 className={`font-bold ${
                   isDiscrepancyZero
@@ -1315,9 +1264,7 @@ function CloseDayConfirmModal({
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="font-bold text-blue-900">
-                Net Safe / Bank Deposit:
-              </span>
+              <span className="font-bold text-blue-900">Net Safe / Bank Deposit:</span>
               <span className="text-base font-extrabold text-blue-900">
                 {formatPrice(netBankDeposit)}
               </span>
@@ -1345,9 +1292,9 @@ function CloseDayConfirmModal({
 
           {/* Warning Notice */}
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-800 leading-5">
-            <strong className="font-semibold">Important:</strong> Finalizing day
-            end will close operations for this working date and advance to the
-            next business cycle. This action cannot be reverted.
+            <strong className="font-semibold">Important:</strong> Finalizing day end
+            will close operations for this working date and advance to the next business
+            cycle. This action cannot be reverted.
           </div>
         </div>
 
@@ -1398,7 +1345,7 @@ function DayEndSuccessModal({
   formatDateDisplay,
   onContinue,
 }: {
-  workingDate: string;
+  workingDate: any;
   totalRevenue: number;
   actualCash: number;
   formatPrice: (price: number) => string;
@@ -1412,27 +1359,21 @@ function DayEndSuccessModal({
           <CheckCircle2 size={36} />
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900">Day End Completed</h2>
+        <h2 className="text-2xl font-bold text-slate-900">
+          Day End Completed
+        </h2>
         <p className="mt-2 text-sm text-slate-500 leading-6">
-          The business day for{" "}
-          <strong className="text-slate-800">
-            {formatDateDisplay(workingDate)}
-          </strong>{" "}
-          has been successfully reconciled and closed.
+          The business day for <strong className="text-slate-800">{formatDateDisplay(workingDate)}</strong> has been successfully reconciled and closed.
         </p>
 
         <div className="my-5 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left text-sm space-y-2">
           <div className="flex justify-between">
             <span className="text-slate-500">Total Revenue:</span>
-            <span className="font-bold text-slate-900">
-              {formatPrice(totalRevenue)}
-            </span>
+            <span className="font-bold text-slate-900">{formatPrice(totalRevenue)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Cash Reconciled:</span>
-            <span className="font-bold text-emerald-700">
-              {formatPrice(actualCash)}
-            </span>
+            <span className="font-bold text-emerald-700">{formatPrice(actualCash)}</span>
           </div>
         </div>
 
@@ -1452,3 +1393,4 @@ function DayEndSuccessModal({
     document.body,
   );
 }
+
