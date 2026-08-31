@@ -1339,7 +1339,6 @@ function CloseDayConfirmModal({
 
 function DayEndSuccessModal({
   workingDate,
-  totalRevenue,
   actualCash,
   formatPrice,
   formatDateDisplay,
