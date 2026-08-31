@@ -113,11 +113,29 @@ type PaymentRecord = {
 type PaymentForm = {
   customerName: string;
   customerPhone: string;
-  vehicleType: string;
+  vehicleType: 1 | 2 | 3 | 4 | 5 | 6;
   VehicleNumber: string;
   discount: string;
   paymentMethod: 1 | 2;
 };
+
+const VehicleType = {
+  Car: 1,
+  Truck: 2,
+  Van: 3,
+  Jeep: 4,
+  Lorry: 5,
+  Bike: 6,
+};
+
+const vehicleTypes = [
+  { value: VehicleType.Car, label: "Car" },
+  { value: VehicleType.Truck, label: "Truck" },
+  { value: VehicleType.Van, label: "Van" },
+  { value: VehicleType.Jeep, label: "Jeep" },
+  { value: VehicleType.Lorry, label: "Lorry" },
+  { value: VehicleType.Bike, label: "Bike" },
+];
 
 type SelectedItem =
   | {
@@ -147,13 +165,19 @@ type AlertState = {
 const initialForm: PaymentForm = {
   customerName: "",
   customerPhone: "",
-  vehicleType: "",
+  vehicleType: 1,
   VehicleNumber: "",
   discount: "0",
 
   // 1 = Cash
   // 2 = Card
   paymentMethod: 1,
+};
+
+const getVehicleTypeName = (vehicleType: number) => {
+  return (
+    vehicleTypes.find((vehicle) => vehicle.value === vehicleType)?.label ?? "-"
+  );
 };
 
 /* =========================================================
@@ -180,8 +204,9 @@ export default function Payments() {
 
   const [isPaymentsLoading, setIsPaymentsLoading] = useState(true);
 
-  const [selectedPayment, setSelectedPayment] =
-    useState<PaymentRecord | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(
+    null,
+  );
 
   /* =======================================================
      Packages / Services
@@ -447,9 +472,7 @@ export default function Payments() {
   }, [currentPage, filteredPayments, itemsPerPage]);
 
   const showingFrom =
-    filteredPayments.length === 0
-      ? 0
-      : (currentPage - 1) * itemsPerPage + 1;
+    filteredPayments.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
 
   const showingTo = Math.min(
     currentPage * itemsPerPage,
@@ -646,10 +669,7 @@ export default function Payments() {
      Form Change
      ========================================================= */
 
-  const handleChange = (
-    field: keyof PaymentForm,
-    value: string | 1 | 2,
-  ) => {
+  const handleChange = (field: keyof PaymentForm, value: string | 1 | 2) => {
     setForm((previous) => ({
       ...previous,
       [field]: value,
@@ -718,10 +738,21 @@ export default function Payments() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (
-      selectedPackageIds.length === 0 &&
-      selectedServiceIds.length === 0
-    ) {
+    const mobileNumber = form.customerPhone.trim();
+
+    if (mobileNumber && !/^07\d{8}$/.test(mobileNumber)) {
+      setPageAlert({
+        visible: true,
+        variant: "warning",
+        title: "Invalid mobile number",
+        description:
+          "Please enter a valid 10-digit mobile number starting with 07.",
+      });
+
+      return;
+    }
+
+    if (selectedPackageIds.length === 0 && selectedServiceIds.length === 0) {
       setPageAlert({
         visible: true,
         variant: "warning",
@@ -760,7 +791,7 @@ export default function Payments() {
     payload.append("CustomerPhone", form.customerPhone.trim());
 
     if (form.vehicleType) {
-      payload.append("VehicleType", form.vehicleType);
+      payload.append("VehicleType", form.vehicleType.toString());
     }
 
     payload.append("VehicleNumber", form.VehicleNumber.trim());
@@ -891,7 +922,6 @@ export default function Payments() {
                   size={16}
                   className={isPaymentsLoading ? "animate-spin" : ""}
                 />
-
                 Refresh
               </button>
 
@@ -901,7 +931,6 @@ export default function Payments() {
                 className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
               >
                 <Plus size={17} />
-
                 Add Payment
               </button>
             </div>
@@ -1039,7 +1068,7 @@ export default function Payments() {
                             </p>
 
                             <p className="mt-0.5 text-xs text-slate-500">
-                              Type: {payment.vehicleType || "-"}
+                              Type: {getVehicleTypeName(payment.vehicleType)}
                             </p>
                           </td>
 
@@ -1101,10 +1130,7 @@ export default function Payments() {
                     (payment.services?.length ?? 0);
 
                   return (
-                    <article
-                      key={payment.carWashOrderId}
-                      className="p-4"
-                    >
+                    <article key={payment.carWashOrderId} className="p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-bold text-slate-900">
@@ -1133,13 +1159,10 @@ export default function Payments() {
 
                         <MobileInfo
                           label="Vehicle"
-                          value={payment.vehicleNumber || "-"}
+                          value={getVehicleTypeName(payment.vehicleType)}
                         />
 
-                        <MobileInfo
-                          label="Items"
-                          value={`${totalItems}`}
-                        />
+                        <MobileInfo label="Items" value={`${totalItems}`} />
 
                         <MobileInfo
                           label="Payment"
@@ -1278,7 +1301,6 @@ export default function Payments() {
               className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
             >
               <ArrowLeft size={17} />
-
               Back to Payments
             </button>
           </div>
@@ -1408,8 +1430,9 @@ export default function Payments() {
 
                               {filteredPackages.length > 0 ? (
                                 filteredPackages.map((item) => {
-                                  const selected =
-                                    selectedPackageIds.includes(item.id);
+                                  const selected = selectedPackageIds.includes(
+                                    item.id,
+                                  );
 
                                   return (
                                     <PackageSelectorItem
@@ -1451,8 +1474,9 @@ export default function Payments() {
 
                               {filteredServices.length > 0 ? (
                                 filteredServices.map((item) => {
-                                  const selected =
-                                    selectedServiceIds.includes(item.id);
+                                  const selected = selectedServiceIds.includes(
+                                    item.id,
+                                  );
 
                                   return (
                                     <SelectorItem
@@ -1601,37 +1625,49 @@ export default function Payments() {
                       label="Customer Name"
                       value={form.customerName}
                       placeholder="Enter customer name"
-                      onChange={(value) =>
-                        handleChange("customerName", value)
-                      }
+                      onChange={(value) => handleChange("customerName", value)}
                     />
 
                     <InputField
                       label="Customer Phone"
                       value={form.customerPhone}
-                      placeholder="Enter phone number"
-                      onChange={(value) =>
-                        handleChange("customerPhone", value)
-                      }
+                      placeholder="0XXXXXXXXX"
+                      onChange={(value) => {
+                        const numericValue = value.replace(/\D/g, "");
+
+                        if (numericValue.length <= 10) {
+                          handleChange("customerPhone", numericValue);
+                        }
+                      }}
                     />
 
-                    <InputField
-                      label="Vehicle Type"
-                      value={form.vehicleType}
-                      type="number"
-                      placeholder="Enter vehicle type"
-                      onChange={(value) =>
-                        handleChange("vehicleType", value)
-                      }
-                    />
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                        Vehicle Type
+                      </label>
+
+                      <select
+                        value={form.vehicleType}
+                        onChange={(event) =>
+                          handleChange("vehicleType", event.target.value)
+                        }
+                        className="h-11 cursor-pointer w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                      >
+                        <option value="">Select vehicle type</option>
+
+                        {vehicleTypes.map((vehicle) => (
+                          <option key={vehicle.value} value={vehicle.value}>
+                            {vehicle.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
                     <InputField
                       label="Vehicle No"
                       value={form.VehicleNumber}
                       placeholder="Example: CAB-1234"
-                      onChange={(value) =>
-                        handleChange("VehicleNumber", value)
-                      }
+                      onChange={(value) => handleChange("VehicleNumber", value)}
                     />
                   </div>
                 </section>
@@ -1730,10 +1766,7 @@ export default function Payments() {
                           Total Payable
                         </span>
 
-                        <Sparkles
-                          size={18}
-                          className="text-emerald-600"
-                        />
+                        <Sparkles size={18} className="text-emerald-600" />
                       </div>
 
                       <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-700">
@@ -1758,17 +1791,12 @@ export default function Payments() {
                     >
                       {isSubmitting ? (
                         <>
-                          <Loader2
-                            size={18}
-                            className="animate-spin"
-                          />
-
+                          <Loader2 size={18} className="animate-spin" />
                           Processing...
                         </>
                       ) : (
                         <>
                           <Plus size={18} />
-
                           Add Payment
                         </>
                       )}
@@ -1865,19 +1893,13 @@ function PaymentDetailsModal({
               value={payment.customerName || "N/A"}
             />
 
-            <DetailCard
-              label="Phone"
-              value={payment.customerPhone || "-"}
-            />
+            <DetailCard label="Phone" value={payment.customerPhone || "-"} />
 
-            <DetailCard
-              label="Vehicle"
-              value={payment.vehicleNumber || "-"}
-            />
+            <DetailCard label="Vehicle" value={payment.vehicleNumber || "-"} />
 
             <DetailCard
               label="Vehicle Type"
-              value={String(payment.vehicleType || "-")}
+              value={getVehicleTypeName(payment.vehicleType)}
             />
 
             <DetailCard
@@ -1894,9 +1916,7 @@ function PaymentDetailsModal({
           {/* Packages */}
 
           <div className="mt-6">
-            <h3 className="font-bold text-slate-900">
-              Packages
-            </h3>
+            <h3 className="font-bold text-slate-900">Packages</h3>
 
             <p className="mt-0.5 text-xs text-slate-500">
               Packages added to this payment.
@@ -1921,9 +1941,7 @@ function PaymentDetailsModal({
           {/* Services */}
 
           <div className="mt-6">
-            <h3 className="font-bold text-slate-900">
-              Individual Services
-            </h3>
+            <h3 className="font-bold text-slate-900">Individual Services</h3>
 
             <p className="mt-0.5 text-xs text-slate-500">
               Individual services added to this payment.
@@ -1961,9 +1979,7 @@ function PaymentDetailsModal({
 
               <div className="border-t border-slate-200 pt-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900">
-                    Total Paid
-                  </span>
+                  <span className="font-bold text-slate-900">Total Paid</span>
 
                   <span className="text-xl font-bold text-emerald-700">
                     {formatPrice(payment.discountedTotalAmount)}
@@ -2008,17 +2024,12 @@ function PackageSelectorItem({
   onSelect: () => void;
   onInfo: () => void;
 }) {
-  const savings = Math.max(
-    item.pricesWithoutDiscounts - item.basPrice,
-    0,
-  );
+  const savings = Math.max(item.pricesWithoutDiscounts - item.basPrice, 0);
 
   return (
     <div
       className={`flex items-center gap-3 border-b border-slate-100 px-4 py-3 ${
-        selected
-          ? "bg-blue-50/70"
-          : "hover:bg-slate-50"
+        selected ? "bg-blue-50/70" : "hover:bg-slate-50"
       }`}
     >
       <button
@@ -2101,10 +2112,7 @@ function PackageInfoModal({
           0,
         );
 
-  const savings = Math.max(
-    normalPrice - packageItem.basPrice,
-    0,
-  );
+  const savings = Math.max(normalPrice - packageItem.basPrice, 0);
 
   return createPortal(
     <div
@@ -2158,16 +2166,11 @@ function PackageInfoModal({
               value={formatPrice(packageItem.basPrice)}
             />
 
-            <MiniPriceCard
-              title="Savings"
-              value={formatPrice(savings)}
-            />
+            <MiniPriceCard title="Savings" value={formatPrice(savings)} />
           </div>
 
           <div className="mt-6">
-            <h3 className="font-bold text-slate-900">
-              Included Services
-            </h3>
+            <h3 className="font-bold text-slate-900">Included Services</h3>
 
             <div className="mt-3 space-y-3">
               {packageItem.services.map((service, index) => (
@@ -2225,13 +2228,9 @@ function SectionHeader({
       </div>
 
       <div>
-        <h2 className="font-bold text-slate-900">
-          {title}
-        </h2>
+        <h2 className="font-bold text-slate-900">{title}</h2>
 
-        <p className="mt-0.5 text-xs text-slate-500">
-          {description}
-        </p>
+        <p className="mt-0.5 text-xs text-slate-500">{description}</p>
       </div>
     </div>
   );
@@ -2290,9 +2289,7 @@ function SelectorItem({
       type="button"
       onClick={onClick}
       className={`flex w-full cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-3 text-left ${
-        selected
-          ? "bg-blue-50/70"
-          : "hover:bg-slate-50"
+        selected ? "bg-blue-50/70" : "hover:bg-slate-50"
       }`}
     >
       <div
@@ -2306,18 +2303,14 @@ function SelectorItem({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-800">
-          {title}
-        </p>
+        <p className="truncate text-sm font-semibold text-slate-800">{title}</p>
 
         <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
           {description}
         </p>
       </div>
 
-      <p className="shrink-0 text-sm font-bold text-emerald-600">
-        {price}
-      </p>
+      <p className="shrink-0 text-sm font-bold text-emerald-600">{price}</p>
     </button>
   );
 }
@@ -2353,21 +2346,15 @@ function PaymentMethodCard({
 
       <div
         className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${
-          selected
-            ? "bg-blue-900 text-white"
-            : "bg-slate-100 text-slate-500"
+          selected ? "bg-blue-900 text-white" : "bg-slate-100 text-slate-500"
         }`}
       >
         {icon}
       </div>
 
-      <p className="text-sm font-bold text-slate-800">
-        {title}
-      </p>
+      <p className="text-sm font-bold text-slate-800">{title}</p>
 
-      <p className="mt-0.5 text-[11px] text-slate-500">
-        {description}
-      </p>
+      <p className="mt-0.5 text-[11px] text-slate-500">{description}</p>
     </button>
   );
 }
@@ -2384,16 +2371,12 @@ function PriceRow({
   return (
     <div
       className={`flex items-center justify-between ${
-        strong
-          ? "border-t border-slate-200 pt-3"
-          : ""
+        strong ? "border-t border-slate-200 pt-3" : ""
       }`}
     >
       <span
         className={
-          strong
-            ? "text-sm font-bold text-slate-800"
-            : "text-sm text-slate-500"
+          strong ? "text-sm font-bold text-slate-800" : "text-sm text-slate-500"
         }
       >
         {title}
@@ -2432,9 +2415,7 @@ function SummaryCard({
       </div>
 
       <div className="min-w-0">
-        <p className="text-sm font-medium text-slate-500">
-          {title}
-        </p>
+        <p className="text-sm font-medium text-slate-500">{title}</p>
 
         <p className="mt-0.5 truncate text-xl font-bold text-slate-900">
           {value}
@@ -2444,11 +2425,7 @@ function SummaryCard({
   );
 }
 
-function TableHeading({
-  children,
-}: {
-  children: ReactNode;
-}) {
+function TableHeading({ children }: { children: ReactNode }) {
   return (
     <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
       {children}
@@ -2456,11 +2433,7 @@ function TableHeading({
   );
 }
 
-function PaymentMethodBadge({
-  paymentMethod,
-}: {
-  paymentMethod: number;
-}) {
+function PaymentMethodBadge({ paymentMethod }: { paymentMethod: number }) {
   if (paymentMethod === 2) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
@@ -2525,18 +2498,10 @@ function OrderStatusBadge({
   );
 }
 
-function MobileInfo({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function MobileInfo({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-slate-50 p-3">
-      <p className="text-[11px] font-medium text-slate-400">
-        {label}
-      </p>
+      <p className="text-[11px] font-medium text-slate-400">{label}</p>
 
       <p className="mt-1 truncate text-sm font-semibold text-slate-700">
         {value}
@@ -2545,22 +2510,12 @@ function MobileInfo({
   );
 }
 
-function DetailCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DetailCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-      <p className="text-xs font-medium text-slate-500">
-        {label}
-      </p>
+      <p className="text-xs font-medium text-slate-500">{label}</p>
 
-      <p className="mt-1 text-sm font-semibold text-slate-900">
-        {value}
-      </p>
+      <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -2581,9 +2536,7 @@ function OrderItem({
           {icon}
         </div>
 
-        <p className="truncate text-sm font-semibold text-slate-800">
-          {name}
-        </p>
+        <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
       </div>
 
       <span className="shrink-0 text-sm font-bold text-emerald-700">
@@ -2593,43 +2546,23 @@ function OrderItem({
   );
 }
 
-function MiniPriceCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: string;
-}) {
+function MiniPriceCard({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs text-slate-500">
-        {title}
-      </p>
+      <p className="text-xs text-slate-500">{title}</p>
 
-      <p className="mt-1 text-lg font-bold text-slate-900">
-        {value}
-      </p>
+      <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
     </div>
   );
 }
 
-function DropdownEmpty({
-  text,
-}: {
-  text: string;
-}) {
+function DropdownEmpty({ text }: { text: string }) {
   return (
-    <div className="px-4 py-6 text-center text-xs text-slate-400">
-      {text}
-    </div>
+    <div className="px-4 py-6 text-center text-xs text-slate-400">{text}</div>
   );
 }
 
-function SmallEmpty({
-  text,
-}: {
-  text: string;
-}) {
+function SmallEmpty({ text }: { text: string }) {
   return (
     <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
       {text}
@@ -2644,13 +2577,11 @@ function PaymentsEmptyState() {
         <ReceiptText size={26} />
       </div>
 
-      <h3 className="font-semibold text-slate-900">
-        No payments found
-      </h3>
+      <h3 className="font-semibold text-slate-900">No payments found</h3>
 
       <p className="mt-1 max-w-sm text-sm text-slate-500">
-        No payments match the current search or no car wash payments have
-        been created yet.
+        No payments match the current search or no car wash payments have been
+        created yet.
       </p>
     </div>
   );
@@ -2664,14 +2595,10 @@ function CustomAlert({
   onClose: () => void;
 }) {
   const styles = {
-    success:
-      "border-emerald-200 bg-emerald-50 text-emerald-800",
-    error:
-      "border-red-200 bg-red-50 text-red-800",
-    warning:
-      "border-amber-200 bg-amber-50 text-amber-800",
-    info:
-      "border-blue-200 bg-blue-50 text-blue-800",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    error: "border-red-200 bg-red-50 text-red-800",
+    warning: "border-amber-200 bg-amber-50 text-amber-800",
+    info: "border-blue-200 bg-blue-50 text-blue-800",
   };
 
   return (
@@ -2679,13 +2606,9 @@ function CustomAlert({
       className={`flex items-start gap-3 rounded-2xl border p-4 shadow-xl ${styles[alert.variant]}`}
     >
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">
-          {alert.title}
-        </p>
+        <p className="font-semibold">{alert.title}</p>
 
-        <p className="mt-1 text-sm opacity-80">
-          {alert.description}
-        </p>
+        <p className="mt-1 text-sm opacity-80">{alert.description}</p>
       </div>
 
       <button
