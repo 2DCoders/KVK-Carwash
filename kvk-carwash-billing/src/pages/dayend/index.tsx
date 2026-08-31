@@ -1363,14 +1363,10 @@ function DayEndSuccessModal({
           Day End Completed
         </h2>
         <p className="mt-2 text-sm text-slate-500 leading-6">
-          The business day for <strong className="text-slate-800">{formatDateDisplay(workingDate)}</strong> has been successfully reconciled and closed.
+          Welcome to new day <strong className="text-slate-800">{formatDateDisplay(workingDate)}</strong> .
         </p>
 
         <div className="my-5 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left text-sm space-y-2">
-          <div className="flex justify-between">
-            <span className="text-slate-500">Total Revenue:</span>
-            <span className="font-bold text-slate-900">{formatPrice(totalRevenue)}</span>
-          </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Cash Reconciled:</span>
             <span className="font-bold text-emerald-700">{formatPrice(actualCash)}</span>
