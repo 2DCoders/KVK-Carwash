@@ -604,7 +604,7 @@ export default function Dayend() {
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              onClick={() => void handleFetchDayEndData()}
+              onClick={() => window.location.reload()}
               disabled={isLoading}
               className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-60"
             >

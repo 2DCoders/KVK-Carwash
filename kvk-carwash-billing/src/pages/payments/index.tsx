@@ -227,6 +227,7 @@ export default function Payments() {
 
   const [isPackagesLoading, setIsPackagesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
 
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [selectorSearch, setSelectorSearch] = useState("");
@@ -419,22 +420,6 @@ export default function Payments() {
     }
   };
 
-  const getOrderStatusName = (status: number) => {
-    switch (status) {
-      case 1:
-        return "Completed";
-
-      case 2:
-        return "In Progress";
-
-      case 3:
-        return "Cancelled";
-
-      default:
-        return `Status ${status}`;
-    }
-  };
-
   /* =========================================================
      Payment List Search
      ========================================================= */
@@ -447,24 +432,11 @@ export default function Payments() {
     }
 
     return payments.filter((payment) => {
-      const packageNames = payment.packages
-        ?.map((item) => item.packageName)
-        .join(" ")
-        .toLowerCase();
-
-      const serviceNames = payment.services
-        ?.map((item) => item.serviceName)
-        .join(" ")
-        .toLowerCase();
-
       return (
         payment.orderNumber?.toLowerCase().includes(search) ||
         payment.customerName?.toLowerCase().includes(search) ||
         payment.customerPhone?.toLowerCase().includes(search) ||
-        payment.vehicleNumber?.toLowerCase().includes(search) ||
-        packageNames?.includes(search) ||
-        serviceNames?.includes(search) ||
-        String(payment.discountedTotalAmount).includes(search)
+        payment.vehicleNumber?.toLowerCase().includes(search)
       );
     });
   }, [paymentSearch, payments]);
@@ -798,6 +770,10 @@ export default function Payments() {
       return;
     }
 
+    setIsConfirmationOpen(true);
+  };
+
+  const handleConfirmPayment = async () => {
     const payload = new FormData();
 
     payload.append("CustomerName", form.customerName.trim());
@@ -808,27 +784,17 @@ export default function Payments() {
     }
 
     payload.append("VehicleNumber", form.VehicleNumber.trim());
-
     payload.append("SubTotalAmount", String(subTotal));
     payload.append("Discount", String(discount));
     payload.append("DiscountedTotalAmount", String(discountedTotal));
-
     payload.append("IsPaid", "true");
-
-    // Card = 2
-    // Cash = 1
     payload.append("PaymentMethod", String(form.paymentMethod));
-
     payload.append("CarWashOrderStatus", "1");
 
-    selectedPackageIds.forEach((id) => {
-      payload.append("PackageIds", id);
-    });
+    selectedPackageIds.forEach((id) => payload.append("PackageIds", id));
+    selectedServiceIds.forEach((id) => payload.append("ServicesIds", id));
 
-    selectedServiceIds.forEach((id) => {
-      payload.append("ServicesIds", id);
-    });
-
+    setIsConfirmationOpen(false);
     await handlePay(payload);
   };
 
@@ -894,8 +860,21 @@ export default function Payments() {
           formatPrice={formatPrice}
           formatDate={formatDate}
           getPaymentMethodName={getPaymentMethodName}
-          getOrderStatusName={getOrderStatusName}
           onClose={() => setSelectedPayment(null)}
+        />
+      )}
+
+      {isConfirmationOpen && (
+        <PaymentConfirmationModal
+          customerName={form.customerName}
+          vehicleNumber={form.VehicleNumber}
+          paymentMethod={getPaymentMethodName(form.paymentMethod)}
+          selectedItems={selectedItems}
+          total={discountedTotal}
+          formatPrice={formatPrice}
+          isSubmitting={isSubmitting}
+          onClose={() => setIsConfirmationOpen(false)}
+          onConfirm={() => void handleConfirmPayment()}
         />
       )}
 
@@ -1000,7 +979,7 @@ export default function Payments() {
                     setPaymentSearch(event.target.value);
                     setCurrentPage(1);
                   }}
-                  placeholder="Search order, customer, phone or vehicle..."
+                  placeholder="Search order, customer, phone or vehicle number"
                   className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 />
               </div>
@@ -1638,7 +1617,12 @@ export default function Payments() {
                       label="Customer Name"
                       value={form.customerName}
                       placeholder="Enter customer name"
-                      onChange={(value) => handleChange("customerName", value)}
+                      onChange={(value) =>
+                        handleChange(
+                          "customerName",
+                          value.replace(/[^a-zA-Z\s]/g, ""),
+                        )
+                      }
                     />
 
                     <InputField
@@ -1826,6 +1810,175 @@ export default function Payments() {
 }
 
 /* =========================================================
+   Payment Confirmation Modal
+   ========================================================= */
+
+function PaymentConfirmationModal({
+  customerName,
+  vehicleNumber,
+  paymentMethod,
+  selectedItems,
+  total,
+  formatPrice,
+  isSubmitting,
+  onClose,
+  onConfirm,
+}: {
+  customerName: string;
+  vehicleNumber: string;
+  paymentMethod: string;
+  selectedItems: SelectedItem[];
+  total: number;
+  formatPrice: (price: number) => string;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSubmitting) {
+          onClose();
+        }
+      }}
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+              <ReceiptText size={19} />
+            </div>
+
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Confirm Payment
+              </h2>
+
+              <p className="mt-0.5 text-xs text-slate-500">
+                Review this car wash order before submitting it.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            aria-label="Close confirmation"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X size={17} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-4">
+          <div className="grid grid-cols-2 gap-2">
+            <ConfirmationSummary
+              label="Customer"
+              value={customerName.trim() || "Walk-in customer"}
+            />
+
+            <ConfirmationSummary
+              label="Payment Method"
+              value={paymentMethod}
+            />
+          </div>
+
+          {vehicleNumber.trim() && (
+            <ConfirmationSummary label="Vehicle Number" value={vehicleNumber} />
+          )}
+
+          <div>
+            <p className="mb-2 text-xs font-semibold text-slate-600">
+              Order Items
+            </p>
+
+            <div className="space-y-2">
+              {selectedItems.map((item) => (
+                <div
+                  key={`${item.type}-${item.id}`}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    {item.type === "package" ? (
+                      <Package size={14} className="shrink-0 text-blue-900" />
+                    ) : (
+                      <CarFront size={14} className="shrink-0 text-slate-500" />
+                    )}
+
+                    <span className="truncate text-xs font-medium text-slate-700">
+                      {item.title}
+                    </span>
+                  </div>
+
+                  <span className="shrink-0 text-xs font-semibold text-slate-700">
+                    {formatPrice(item.price)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+            <span className="text-sm font-bold text-slate-900">
+              Total Payable
+            </span>
+
+            <span className="text-lg font-bold text-emerald-700">
+              {formatPrice(total)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isSubmitting}
+            className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-900 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Check size={14} />
+            )}
+            {isSubmitting ? "Processing..." : "Confirm Payment"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function ConfirmationSummary({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+      <p className="text-[10px] font-medium text-slate-500">{label}</p>
+      <p className="mt-0.5 truncate text-xs font-semibold text-slate-800">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+/* =========================================================
    Payment Details Modal
    ========================================================= */
 
@@ -1834,14 +1987,12 @@ function PaymentDetailsModal({
   formatPrice,
   formatDate,
   getPaymentMethodName,
-  getOrderStatusName,
   onClose,
 }: {
   payment: PaymentRecord;
   formatPrice: (price: number) => string;
   formatDate: (date: string) => string;
   getPaymentMethodName: (method: number) => string;
-  getOrderStatusName: (status: number) => string;
   onClose: () => void;
 }) {
   return createPortal(
@@ -1913,11 +2064,6 @@ function PaymentDetailsModal({
             <DetailCard
               label="Vehicle Type"
               value={getVehicleTypeName(payment.vehicleType)}
-            />
-
-            <DetailCard
-              label="Order Status"
-              value={getOrderStatusName(payment.carWashOrderStatus)}
             />
 
             <DetailCard

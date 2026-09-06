@@ -37,7 +37,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       <div className="flex relative z-10">
         {/* Sidebar - Desktop */}
-        <div className={`hidden lg:block ${sidebarOpen ? 'w-72' : 'w-20'} fixed left-0 top-0 h-screen`}>
+        <div className={`hidden lg:block ${sidebarOpen ? 'w-72' : 'w-20'} fixed left-0 top-0 z-30 h-screen`}>
           <Sidebar isOpen={sidebarOpen} isMobile={false} />
         </div>
 
