@@ -40,6 +40,7 @@ import { useNavigate } from "react-router-dom";
    ========================================================= */
 
 type CarService = {
+  isActive?: boolean;
   id: string;
   title: string;
   durationInMinutes: number;
@@ -298,13 +299,17 @@ export default function Payments() {
 
       const res: PackagesResponse = await getAllCarPackages();
 
-      setPackages(
-        Array.isArray(res?.packagesWithServices)
-          ? res.packagesWithServices
-          : [],
-      );
+      const availablePackages = Array.isArray(res?.packagesWithServices)
+        ? res.packagesWithServices.filter((item) => item.isActive)
+        : [];
+      const availableServices = Array.isArray(res?.allServices)
+        ? res.allServices.filter((service) => service.isActive !== false)
+        : [];
 
-      setServices(Array.isArray(res?.allServices) ? res.allServices : []);
+      setPackages(availablePackages);
+      setServices(availableServices);
+      setSelectedPackageIds((ids) => ids.filter((id) => availablePackages.some((item) => item.id === id)));
+      setSelectedServiceIds((ids) => ids.filter((id) => availableServices.some((item) => item.id === id)));
     } catch (error) {
       console.error("Error fetching packages:", error);
 
