@@ -587,7 +587,8 @@ export default function Packages() {
         visible: true,
         variant: "error",
         title: "Unable to delete package",
-        description: "An error occurred while deleting the package.",
+        description: (error as { response?: { data?: { message?: string } } })
+          .response?.data?.message || "An error occurred while deleting the package.",
       });
     } finally {
       setIsSubmitting(false);

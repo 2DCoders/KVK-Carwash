@@ -603,7 +603,8 @@ export default function CarwashServices() {
         visible: true,
         variant: "error",
         title: "Unable to delete service",
-        description: "An error occurred while deleting the service.",
+        description: (error as { response?: { data?: { message?: string } } })
+          .response?.data?.message || "An error occurred while deleting the service.",
       });
     } finally {
       setIsSubmitting(false);
