@@ -14,7 +14,6 @@ import {
   Plus,
   RefreshCcw,
   Search,
-  Sparkles,
   Trash2,
   UploadCloud,
   X,
@@ -33,7 +32,6 @@ type Service = {
   description: string;
   price: number;
   image?: string | null;
-  features: string[];
 };
 
 const DEFAULT_IMAGE_MIME_TYPE = "image/jpeg";
@@ -55,28 +53,12 @@ const getBase64ImageSource = (image?: string | null) => {
   return `data:${DEFAULT_IMAGE_MIME_TYPE};base64,${value}`;
 };
 
-const normalizeFeatures = (features: unknown): string[] => {
-  if (Array.isArray(features)) {
-    return features.map((feature) => String(feature).trim()).filter(Boolean);
-  }
-
-  if (typeof features === "string") {
-    return features
-      .split(",")
-      .map((feature) => feature.trim())
-      .filter(Boolean);
-  }
-
-  return [];
-};
-
 const normalizeService = (service: any): Service => ({
   id: String(service.id ?? crypto.randomUUID()),
   title: String(service.title ?? ""),
   description: String(service.description ?? ""),
   price: Number(service.price ?? 0),
   image: service.image ?? null,
-  features: normalizeFeatures(service.features),
 });
 
 const fileToBase64 = (file: File): Promise<string> => {
@@ -104,11 +86,10 @@ type ServiceForm = {
   title: string;
   description: string;
   price: string;
-  features: string[];
 };
 
 type FormErrors = Partial<
-  Record<"title" | "description" | "price" | "features" | "image", string>
+  Record<"title" | "description" | "price" | "image", string>
 >;
 
 type AlertState = {
@@ -122,7 +103,6 @@ const initialForm: ServiceForm = {
   title: "",
   description: "",
   price: "",
-  features: [""],
 };
 
 export default function CarwashServices() {
@@ -297,8 +277,6 @@ export default function CarwashServices() {
       title: service.title,
       description: service.description,
       price: String(service.price),
-      features:
-        service.features.length > 0 ? service.features.slice(0, 5) : [""],
     });
 
     setSelectedImage(null);
@@ -345,55 +323,6 @@ export default function CarwashServices() {
     }
   };
 
-  const handleFeatureChange = (index: number, value: string) => {
-    setForm((previous) => ({
-      ...previous,
-      features: previous.features.map((feature, featureIndex) =>
-        featureIndex === index ? value : feature,
-      ),
-    }));
-
-    if (formErrors.features) {
-      setFormErrors((previous) => ({
-        ...previous,
-        features: undefined,
-      }));
-    }
-  };
-
-  const handleAddFeature = () => {
-    setForm((previous) => {
-      if (previous.features.length >= 5) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        features: [...previous.features, ""],
-      };
-    });
-  };
-
-  const handleRemoveFeature = (index: number) => {
-    setForm((previous) => {
-      if (previous.features.length <= 1) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        features: previous.features.filter(
-          (_, featureIndex) => featureIndex !== index,
-        ),
-      };
-    });
-
-    setFormErrors((previous) => ({
-      ...previous,
-      features: undefined,
-    }));
-  };
-
   const validateForm = () => {
     const errors: FormErrors = {};
 
@@ -415,16 +344,6 @@ export default function CarwashServices() {
       errors.price = "Price is required.";
     } else if (Number.isNaN(price) || price <= 0) {
       errors.price = "Enter a valid price greater than zero.";
-    }
-
-    const normalizedFeatures = form.features
-      .map((feature) => feature.trim())
-      .filter(Boolean);
-
-    if (normalizedFeatures.length === 0) {
-      errors.features = "Please add at least one feature.";
-    } else if (normalizedFeatures.length > 5) {
-      errors.features = "Maximum 5 features are allowed.";
     }
 
     if (formMode === "add" && !selectedImage && !imagePreview) {
@@ -519,23 +438,17 @@ export default function CarwashServices() {
     try {
       setIsSubmitting(true);
 
-      const normalizedFeatures = form.features
-        .map((feature) => feature.trim())
-        .filter(Boolean);
-
       const serviceData = {
         title: form.title.trim(),
         description: form.description.trim(),
         price: Number(form.price),
         image: imagePreview,
-        features: normalizedFeatures,
       };
 
       const payload = new FormData();
       payload.append("Title", serviceData.title);
       payload.append("Description", serviceData.description);
       payload.append("Price", String(serviceData.price));
-      payload.append("Features", normalizedFeatures.join(","));
 
       if (selectedImage) {
         payload.append("Image", selectedImage);
@@ -658,7 +571,7 @@ export default function CarwashServices() {
               </h1>
 
               <p className="text-sm text-slate-500">
-                Manage service details, pricing, images and features.
+                Manage service details, pricing and images.
               </p>
             </div>
           </div>
@@ -1061,9 +974,6 @@ export default function CarwashServices() {
           isDragging={isDragging}
           isSubmitting={isSubmitting}
           onChange={handleFormChange}
-          onFeatureChange={handleFeatureChange}
-          onAddFeature={handleAddFeature}
-          onRemoveFeature={handleRemoveFeature}
           onFileChange={handleFileInputChange}
           onDrop={handleDrop}
           onDragOver={(event) => {
@@ -1105,9 +1015,6 @@ type ServiceFormModalProps = {
   isDragging: boolean;
   isSubmitting: boolean;
   onChange: (field: "title" | "description" | "price", value: string) => void;
-  onFeatureChange: (index: number, value: string) => void;
-  onAddFeature: () => void;
-  onRemoveFeature: (index: number) => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
@@ -1125,9 +1032,6 @@ function ServiceFormModal({
   isDragging,
   isSubmitting,
   onChange,
-  onFeatureChange,
-  onAddFeature,
-  onRemoveFeature,
   onFileChange,
   onDrop,
   onDragOver,
@@ -1159,7 +1063,7 @@ function ServiceFormModal({
               </h2>
 
               <p className="text-sm text-slate-500">
-                Add service information, features and one image.
+                Add service information and one image.
               </p>
             </div>
           </div>
@@ -1206,81 +1110,6 @@ function ServiceFormModal({
                   onChange={(value) => onChange("price", value)}
                 />
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700">
-                        Features
-                        <span className="ml-1 text-red-500">*</span>
-                      </label>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        Add between 1 and 5 service features.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={onAddFeature}
-                      disabled={form.features.length >= 5}
-                      className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-900 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                    >
-                      <Plus size={14} />
-                      Add Feature
-                    </button>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    {form.features.map((feature, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <div className="relative flex-1">
-                          <span className="pointer-events-none absolute left-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-50 text-[10px] font-bold text-blue-900">
-                            {index + 1}
-                          </span>
-                          <input
-                            type="text"
-                            value={feature}
-                            maxLength={100}
-                            placeholder={`Enter feature ${index + 1}`}
-                            onChange={(event) =>
-                              onFeatureChange(index, event.target.value)
-                            }
-                            className={`h-11 w-full rounded-xl border bg-white pl-10 pr-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
-                              errors.features
-                                ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                                : "border-slate-200 focus:border-blue-500 focus:ring-blue-100"
-                            }`}
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => onRemoveFeature(index)}
-                          disabled={form.features.length === 1}
-                          aria-label={`Remove feature ${index + 1}`}
-                          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-200 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
-                        >
-                          <Trash2 size={17} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3">
-                    {errors.features ? (
-                      <p className="text-xs font-medium text-red-600">
-                        {errors.features}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-slate-500">
-                        Features are submitted as a comma-separated string.
-                      </p>
-                    )}
-
-                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                      {form.features.length}/5
-                    </span>
-                  </div>
-                </div>
               </div>
 
               <div>
@@ -1471,28 +1300,6 @@ function ViewServiceModal({
             </span>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <Sparkles size={18} className="text-blue-900" />
-
-              <h4 className="font-bold text-slate-900">Service Features</h4>
-            </div>
-
-            <div className="space-y-3">
-              {service.features.map((feature, index) => (
-                <div
-                  key={`${feature}-${index}`}
-                  className="flex items-start gap-3"
-                >
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-900 text-white">
-                    <Check size={13} />
-                  </div>
-
-                  <p className="text-sm leading-6 text-slate-700">{feature}</p>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>,

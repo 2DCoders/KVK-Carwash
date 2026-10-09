@@ -47,7 +47,6 @@ type CarService = {
   serviceCategory: number;
   description: string;
   price: number;
-  features: string;
 };
 
 type CarPackage = {
