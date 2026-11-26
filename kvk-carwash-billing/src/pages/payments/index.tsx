@@ -1,5 +1,7 @@
 import { getAllCarPackages } from "@/services/carwash-packages-api";
-import { getPayments, pay } from "@/services/payments-api";
+import { getPayment, getPayments, pay, type PaymentRecord } from "@/services/payments-api";
+import { createPaymentReceipt } from "@/services/payment-receipt";
+import PaymentReceiptViewer from "@/components/payment-receipt-viewer";
 
 import {
   ArrowLeft,
@@ -9,6 +11,7 @@ import {
   Check,
   ChevronDown,
   CreditCard,
+  Download,
   Eye,
   Info,
   Loader2,
@@ -66,48 +69,6 @@ type PackagesResponse = {
 };
 
 /* =========================================================
-   Payment Response Types
-   ========================================================= */
-
-type PaymentPackage = {
-  carWashPackageId: string;
-  packageName: string;
-  packagePrice: number;
-};
-
-type PaymentService = {
-  carWashServiceId: string;
-  serviceName: string;
-  servicePrice: number;
-};
-
-type PaymentRecord = {
-  carWashOrderId: string;
-  orderNumber: string;
-  orderDate: string;
-
-  customerName: string;
-  customerPhone: string;
-
-  vehicleType: number;
-  vehicleNumber: string;
-
-  totalMinutesSpent: number;
-
-  subTotalAmount: number;
-  discount: number;
-  discountedTotalAmount: number;
-
-  isPaid: boolean;
-
-  paymentMethod: number;
-  carWashOrderStatus: number;
-
-  packages: PaymentPackage[];
-  services: PaymentService[];
-};
-
-/* =========================================================
    Form Types
    ========================================================= */
 
@@ -128,6 +89,8 @@ const VehicleType = {
   Lorry: 5,
   Bike: 6,
 };
+
+const paymentActionClass = "inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
 
 const vehicleTypes = [
   { value: VehicleType.Car, label: "Car" },
@@ -191,6 +154,7 @@ export default function Payments() {
      ======================================================= */
 
   const [pageView, setPageView] = useState<"list" | "add">("list");
+  const [receipt, setReceipt] = useState<{ pdf: Blob; filename: string } | null>(null);
 
   /* =======================================================
      Payment List
@@ -684,24 +648,53 @@ export default function Payments() {
      Handle Pay
      ========================================================= */
 
+  function buildReceipt(payment: PaymentRecord) {
+    return createPaymentReceipt(payment, getPaymentMethodName(payment.paymentMethod), getVehicleTypeName(payment.vehicleType));
+  }
+
+  function downloadReceipt(payment: PaymentRecord) {
+    if (!payment.isPaid) return;
+    try {
+      const { doc, filename } = buildReceipt(payment);
+      doc.save(filename);
+    } catch {
+      setPageAlert({
+        visible: true,
+        variant: "error",
+        title: "Receipt unavailable",
+        description: "Unable to download the receipt. Please try again.",
+      });
+    }
+  }
+
   const handlePay = async (paymentData: FormData) => {
     try {
       setIsSubmitting(true);
 
       const response = await pay(paymentData);
+      let receiptFailed = false;
+      try {
+        const orderId = response.additionalData?.orderId;
+        if (!orderId) throw new Error("Missing saved order ID.");
+        const { doc, filename } = buildReceipt(await getPayment(orderId));
+        setReceipt({ pdf: doc.output("blob"), filename });
+      } catch {
+        receiptFailed = true;
+      }
 
       setPageAlert({
         visible: true,
-        variant: "success",
+        variant: receiptFailed ? "warning" : "success",
         title: "Payment successful",
-        description: "The car wash payment was added successfully.",
+        description: receiptFailed
+          ? "Payment recorded. Download the receipt from Payments."
+          : "The car wash payment was added successfully.",
       });
 
       resetPaymentForm();
 
-      await getAllPayments();
-
       setPageView("list");
+      void getAllPayments();
 
       return response;
     } catch (error) {
@@ -1093,14 +1086,18 @@ export default function Payments() {
                           {/* Action */}
 
                           <td className="px-5 py-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedPayment(payment)}
-                              title="View payment details"
-                              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-900 hover:bg-blue-50 hover:text-blue-700"
-                            >
-                              <Eye size={17} />
-                            </button>
+                            <div className="flex min-w-[80px] justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPayment(payment)}
+                                title="View payment details"
+                                aria-label="View payment details"
+                                className={paymentActionClass}
+                              >
+                                <Eye size={17} />
+                              </button>
+                              {payment.isPaid && <DownloadReceiptButton onClick={() => downloadReceipt(payment)} />}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1138,13 +1135,18 @@ export default function Payments() {
                           </p>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPayment(payment)}
-                          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-900"
-                        >
-                          <Eye size={17} />
-                        </button>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPayment(payment)}
+                            title="View payment details"
+                            aria-label="View payment details"
+                            className={paymentActionClass}
+                          >
+                            <Eye size={17} />
+                          </button>
+                          {payment.isPaid && <DownloadReceiptButton onClick={() => downloadReceipt(payment)} />}
+                        </div>
                       </div>
 
                       <div className="mt-4 grid grid-cols-2 gap-3">
@@ -1809,7 +1811,17 @@ export default function Payments() {
           </form>
         </div>
       )}
+      {receipt && <PaymentReceiptViewer {...receipt} onClose={() => setReceipt(null)} />}
     </main>
+  );
+}
+
+function DownloadReceiptButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} title="Download receipt" aria-label="Download receipt"
+      className={paymentActionClass}>
+      <Download size={17} />
+    </button>
   );
 }
 
